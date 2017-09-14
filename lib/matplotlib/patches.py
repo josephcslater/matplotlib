@@ -688,10 +688,10 @@ class Rectangle(Patch):
 
         Patch.__init__(self, **kwargs)
 
-        self._x = float(xy[0])
-        self._y = float(xy[1])
-        self._width = float(width)
-        self._height = float(height)
+        self._x = xy[0]
+        self._y = xy[1]
+        self._width = width
+        self._height = height
         self.angle = float(angle)
         # Note: This cannot be calculated until this is added to an Axes
         self._rect_transform = transforms.IdentityTransform()
@@ -1131,21 +1131,42 @@ class Arrow(Patch):
     def __str__(self):
         return "Arrow()"
 
-    _path = Path([
-            [0.0,  0.1], [0.0, -0.1],
-            [0.8, -0.1], [0.8, -0.3],
-            [1.0,  0.0], [0.8,  0.3],
-            [0.8,  0.1], [0.0,  0.1]],
-                  closed=True)
+    _path = Path([[0.0, 0.1], [0.0, -0.1],
+                  [0.8, -0.1], [0.8, -0.3],
+                  [1.0, 0.0], [0.8, 0.3],
+                  [0.8, 0.1], [0.0, 0.1]],
+                 closed=True)
 
     @docstring.dedent_interpd
     def __init__(self, x, y, dx, dy, width=1.0, **kwargs):
         """
-        Draws an arrow, starting at (*x*, *y*), direction and length
-        given by (*dx*, *dy*) the width of the arrow is scaled by *width*.
+        Draws an arrow from (*x*, *y*) to (*x* + *dx*, *y* + *dy*).
+        The width of the arrow is scaled by *width*.
 
-        Valid kwargs are:
-        %(Patch)s
+        Parameters
+        ----------
+        x : scalar
+            x coordinate of the arrow tail
+        y : scalar
+            y coordinate of the arrow tail
+        dx : scalar
+            Arrow length in the x direction
+        dy : scalar
+            Arrow length in the y direction
+        width : scalar, optional (default: 1)
+            Scale factor for the width of the arrow. With a default value of
+            1, the tail width is 0.2 and head width is 0.6.
+        **kwargs :
+            Keyword arguments control the :class:`~matplotlib.patches.Patch`
+            properties:
+
+            %(Patch)s
+
+        See Also
+        --------
+        :class:`FancyArrow` :
+            Patch that allows independent control of the head and tail
+            properties
         """
         Patch.__init__(self, **kwargs)
         L = np.hypot(dx, dy)
@@ -1271,8 +1292,6 @@ class FancyArrow(Polygon):
 
 docstring.interpd.update({"FancyArrow": FancyArrow.__init__.__doc__})
 
-docstring.interpd.update({"FancyArrow": FancyArrow.__init__.__doc__})
-
 
 class YAArrow(Patch):
     """
@@ -1357,7 +1376,7 @@ class YAArrow(Patch):
         line and intersects (*x2*, *y2*) and the distance from (*x2*,
         *y2*) of the returned points is *k*.
         """
-        x1, y1, x2, y2, k = list(map(float, (x1, y1, x2, y2, k)))
+        x1, y1, x2, y2, k = map(float, (x1, y1, x2, y2, k))
 
         if y2 - y1 == 0:
             return x2, y2 + k, x2, y2 - k
@@ -1370,10 +1389,10 @@ class YAArrow(Patch):
         b = -2 * y2
         c = y2 ** 2. - k ** 2. * pm ** 2. / (1. + pm ** 2.)
 
-        y3a = (-b + math.sqrt(b ** 2. - 4 * a * c)) / (2. * a)
+        y3a = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
         x3a = (y3a - y2) / pm + x2
 
-        y3b = (-b - math.sqrt(b ** 2. - 4 * a * c)) / (2. * a)
+        y3b = (-b - math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
         x3b = (y3b - y2) / pm + x2
         return x3a, y3a, x3b, y3b
 
@@ -1632,8 +1651,7 @@ class Arc(Ellipse):
         theta2 = theta_stretch(self.theta2, width / height)
 
         # Get width and height in pixels
-        width, height = self.get_transform().transform_point(
-            (width, height))
+        width, height = self.get_transform().transform_point((width, height))
         inv_error = (1.0 / 1.89818e-6) * 0.5
         if width < inv_error and height < inv_error:
             self._path = Path.arc(theta1, theta2)
@@ -1974,7 +1992,7 @@ class BoxStyle(_Style):
         def transmute(self, x0, y0, width, height, mutation_size):
             """
             The transmute method is a very core of the
-            :class:`BboxTransmuter` class and must be overriden in the
+            :class:`BboxTransmuter` class and must be overridden in the
             subclasses. It receives the location and size of the
             rectangle, and the mutation_size, with which the amount of
             padding and etc. will be scaled. It returns a
@@ -2864,10 +2882,10 @@ class ConnectionStyle(_Style):
             x1, y1 = posA
             x2, y2 = posB
 
-            cosA, sinA = (math.cos(self.angleA / 180. * math.pi),
-                          math.sin(self.angleA / 180. * math.pi))
-            cosB, sinB = (math.cos(self.angleB / 180. * math.pi),
-                          math.sin(self.angleB / 180. * math.pi))
+            cosA = math.cos(math.radians(self.angleA))
+            sinA = math.sin(math.radians(self.angleA))
+            cosB = math.cos(math.radians(self.angleB))
+            sinB = math.sin(math.radians(self.angleB))
 
             cx, cy = get_intersection(x1, y1, cosA, sinA,
                                       x2, y2, cosB, sinB)
@@ -2909,10 +2927,10 @@ class ConnectionStyle(_Style):
             x1, y1 = posA
             x2, y2 = posB
 
-            cosA, sinA = (math.cos(self.angleA / 180. * math.pi),
-                          math.sin(self.angleA / 180. * math.pi))
-            cosB, sinB = (math.cos(self.angleB / 180. * math.pi),
-                          math.sin(self.angleB / 180. * math.pi))
+            cosA = math.cos(math.radians(self.angleA))
+            sinA = math.sin(math.radians(self.angleA))
+            cosB = math.cos(math.radians(self.angleB))
+            sinB = math.sin(math.radians(self.angleB))
 
             cx, cy = get_intersection(x1, y1, cosA, sinA,
                                       x2, y2, cosB, sinB)
@@ -2985,8 +3003,8 @@ class ConnectionStyle(_Style):
             codes = [Path.MOVETO]
 
             if self.armA:
-                cosA = math.cos(self.angleA / 180. * math.pi)
-                sinA = math.sin(self.angleA / 180. * math.pi)
+                cosA = math.cos(math.radians(self.angleA))
+                sinA = math.sin(math.radians(self.angleA))
                 # x_armA, y_armB
                 d = self.armA - self.rad
                 rounded.append((x1 + d * cosA, y1 + d * sinA))
@@ -2994,8 +3012,8 @@ class ConnectionStyle(_Style):
                 rounded.append((x1 + d * cosA, y1 + d * sinA))
 
             if self.armB:
-                cosB = math.cos(self.angleB / 180. * math.pi)
-                sinB = math.sin(self.angleB / 180. * math.pi)
+                cosB = math.cos(math.radians(self.angleB))
+                sinB = math.sin(math.radians(self.angleB))
                 x_armB, y_armB = x2 + self.armB * cosB, y2 + self.armB * sinB
 
                 if rounded:
@@ -3080,14 +3098,11 @@ class ConnectionStyle(_Style):
             armA, armB = self.armA, self.armB
 
             if self.angle is not None:
-                theta0 = self.angle / 180. * math.pi
+                theta0 = np.deg2rad(self.angle)
                 dtheta = theta1 - theta0
-
                 dl = dd * math.sin(dtheta)
                 dL = dd * math.cos(dtheta)
-
                 x2, y2 = x1 + dL * math.cos(theta0), y1 + dL * math.sin(theta0)
-
                 armB = armB - dl
 
                 # update
@@ -3212,7 +3227,7 @@ class ArrowStyle(_Style):
         def transmute(self, path, mutation_size, linewidth):
             """
             The transmute method is the very core of the ArrowStyle
-            class and must be overriden in the subclasses. It receives
+            class and must be overridden in the subclasses. It receives
             the path object along which the arrow will be drawn, and
             the mutation_size, with which the arrow head etc.
             will be scaled. The linewidth may be used to adjust
@@ -3335,8 +3350,8 @@ class ArrowStyle(_Style):
 
         def transmute(self, path, mutation_size, linewidth):
 
-            head_length, head_width = self.head_length * mutation_size, \
-                                      self.head_width * mutation_size
+            head_length = self.head_length * mutation_size
+            head_width = self.head_width * mutation_size
             head_dist = math.sqrt(head_length ** 2 + head_width ** 2)
             cos_t, sin_t = head_length / head_dist, head_width / head_dist
 
@@ -3345,8 +3360,7 @@ class ArrowStyle(_Style):
             x1, y1 = path.vertices[1]
 
             # If there is no room for an arrow and a line, then skip the arrow
-            has_begin_arrow = (self.beginarrow and
-                               not ((x0 == x1) and (y0 == y1)))
+            has_begin_arrow = self.beginarrow and not (x0 == x1 and y0 == y1)
             if has_begin_arrow:
                 verticesA, codesA, ddxA, ddyA = \
                            self._get_arrow_wedge(x1, y1, x0, y0,
@@ -3995,6 +4009,10 @@ docstring.interpd.update(
 class FancyArrowPatch(Patch):
     """
     A fancy arrow patch. It draws an arrow using the :class:`ArrowStyle`.
+
+    The head and tail positions are fixed at the specified start and end points
+    of the arrow, but the size and shape (in display coordinates) of the arrow
+    does not change when the axis is moved or zoomed.
     """
     _edge_default = True
 
@@ -4085,7 +4103,7 @@ class FancyArrowPatch(Patch):
             the mutation and the mutated box will be stretched by the inverse
             of it.
 
-        dpi_cor : scalar, optional (defualt: 1)
+        dpi_cor : scalar, optional (default: 1)
             dpi_cor is currently used for linewidth-related things and shrink
             factor. Mutation scale is affected by this.
 

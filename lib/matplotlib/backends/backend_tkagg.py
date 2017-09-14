@@ -16,11 +16,10 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib.backends.windowing as windowing
 
 import matplotlib
-from matplotlib.backend_bases import RendererBase, GraphicsContextBase
-from matplotlib.backend_bases import FigureManagerBase, FigureCanvasBase
-from matplotlib.backend_bases import NavigationToolbar2, cursors, TimerBase
-from matplotlib.backend_bases import (ShowBase, ToolContainerBase,
-                                      StatusbarBase)
+from matplotlib.backend_bases import (
+    _Backend, FigureCanvasBase, FigureManagerBase, GraphicsContextBase,
+    NavigationToolbar2, RendererBase, StatusbarBase, TimerBase,
+    ToolContainerBase, cursors)
 from matplotlib.backend_managers import ToolManager
 from matplotlib import backend_tools
 from matplotlib._pylab_helpers import Gcf
@@ -46,6 +45,7 @@ cursord = {
     cursors.HAND: "hand2",
     cursors.POINTER: "arrow",
     cursors.SELECT_REGION: "tcross",
+    cursors.WAIT: "watch",
     }
 
 
@@ -58,58 +58,6 @@ def raise_msg_to_str(msg):
 def error_msg_tkpaint(msg, parent=None):
     from six.moves import tkinter_messagebox as tkMessageBox
     tkMessageBox.showerror("matplotlib", msg)
-
-def draw_if_interactive():
-    if matplotlib.is_interactive():
-        figManager =  Gcf.get_active()
-        if figManager is not None:
-            figManager.show()
-
-class Show(ShowBase):
-    def mainloop(self):
-        Tk.mainloop()
-
-show = Show()
-
-def new_figure_manager(num, *args, **kwargs):
-    """
-    Create a new figure manager instance
-    """
-    FigureClass = kwargs.pop('FigureClass', Figure)
-    figure = FigureClass(*args, **kwargs)
-    return new_figure_manager_given_figure(num, figure)
-
-
-def new_figure_manager_given_figure(num, figure):
-    """
-    Create a new figure manager instance for the given figure.
-    """
-    _focus = windowing.FocusManager()
-    window = Tk.Tk(className="matplotlib")
-    window.withdraw()
-
-    if Tk.TkVersion >= 8.5:
-        # put a mpl icon on the window rather than the default tk icon. Tkinter
-        # doesn't allow colour icons on linux systems, but tk >=8.5 has a iconphoto
-        # command which we call directly. Source:
-        # http://mail.python.org/pipermail/tkinter-discuss/2006-November/000954.html
-        icon_fname = os.path.join(rcParams['datapath'], 'images', 'matplotlib.ppm')
-        icon_img = Tk.PhotoImage(file=icon_fname)
-        try:
-            window.tk.call('wm', 'iconphoto', window._w, icon_img)
-        except (SystemExit, KeyboardInterrupt):
-            # re-raise exit type Exceptions
-            raise
-        except:
-            # log the failure, but carry on
-            verbose.report('Could not load matplotlib icon: %s' % sys.exc_info()[1])
-
-    canvas = FigureCanvasTkAgg(figure, master=window)
-    figManager = FigureManagerTkAgg(canvas, num, window)
-    if matplotlib.is_interactive():
-        figManager.show()
-        canvas.draw_idle()
-    return figManager
 
 
 class TimerTk(TimerBase):
@@ -147,8 +95,10 @@ class TimerTk(TimerBase):
         TimerBase._on_timer(self)
 
         # Tk after() is only a single shot, so we need to add code here to
-        # reset the timer if we're not operating in single shot mode.
-        if not self._single and len(self.callbacks) > 0:
+        # reset the timer if we're not operating in single shot mode.  However,
+        # if _timer is None, this means that _timer_stop has been called; so
+        # don't recreate the timer in that case.
+        if not self._single and self._timer:
             self._timer = self.parent.after(self._interval, self._on_timer)
         else:
             self._timer = None
@@ -320,9 +270,9 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         # backend_bases, the canvas needs to know _lastx and _lasty.
         # There are three ways to get this info the canvas:
         #
-        # 1) set it explicity
+        # 1) set it explicitly
         #
-        # 2) call enter/leave events explicity.  The downside of this
+        # 2) call enter/leave events explicitly.  The downside of this
         #    in the impl below is that enter could be repeatedly
         #    triggered if thes  mouse is over the axes and one is
         #    resizing with the keyboard.  This is not entirely bad,
@@ -522,6 +472,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         FigureCanvasBase.stop_event_loop_default(self)
     stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
 
+
 class FigureManagerTkAgg(FigureManagerBase):
     """
     Attributes
@@ -719,7 +670,6 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         self.canvas = canvas
         self.window = window
         self._idle = True
-        #Tk.Frame.__init__(self, master=self.canvas._tkcanvas)
         NavigationToolbar2.__init__(self, canvas)
 
     def destroy(self, *args):
@@ -731,11 +681,10 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
         height = self.canvas.figure.bbox.height
-        y0 =  height-y0
-        y1 =  height-y1
-        try: self.lastrect
-        except AttributeError: pass
-        else: self.canvas._tkcanvas.delete(self.lastrect)
+        y0 = height - y0
+        y1 = height - y1
+        if hasattr(self, "lastrect"):
+            self.canvas._tkcanvas.delete(self.lastrect)
         self.lastrect = self.canvas._tkcanvas.create_rectangle(x0, y0, x1, y1)
 
         #self.canvas.draw()
@@ -749,9 +698,11 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
     def set_cursor(self, cursor):
         self.window.configure(cursor=cursord[cursor])
+        self.window.update_idletasks()
 
     def _Button(self, text, file, command, extension='.gif'):
-        img_file = os.path.join(rcParams['datapath'], 'images', file + extension)
+        img_file = os.path.join(
+            rcParams['datapath'], 'images', file + extension)
         im = Tk.PhotoImage(master=self, file=img_file)
         b = Tk.Button(
             master=self, text=text, padx=2, pady=2, image=im, command=command)
@@ -761,10 +712,11 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
     def _Spacer(self):
         # Buttons are 30px high, so make this 26px tall with padding to center it
-        s = Tk.Frame(master=self, height=26, relief=Tk.RIDGE, pady=2, bg="DarkGray")
+        s = Tk.Frame(
+            master=self, height=26, relief=Tk.RIDGE, pady=2, bg="DarkGray")
         s.pack(side=Tk.LEFT, padx=5)
         return s
-        
+
     def _init_toolbar(self):
         xmin, xmax = self.canvas.figure.bbox.intervalx
         height, width = 50, xmax-xmin
@@ -776,11 +728,11 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
         for text, tooltip_text, image_file, callback in self.toolitems:
             if text is None:
-                # Add a spacer -- we don't need to use the return value for anything
+                # Add a spacer; return value is unused.
                 self._Spacer()
             else:
                 button = self._Button(text=text, file=image_file,
-                                   command=getattr(self, callback))
+                                      command=getattr(self, callback))
                 if tooltip_text is not None:
                     ToolTip.createToolTip(button, tooltip_text)
 
@@ -788,7 +740,6 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         self._message_label = Tk.Label(master=self, textvariable=self.message)
         self._message_label.pack(side=Tk.RIGHT)
         self.pack(side=Tk.BOTTOM, fill=Tk.X)
-
 
     def configure_subplots(self):
         toolfig = Figure(figsize=(6,3))
@@ -817,8 +768,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         # work - JDH!
         #defaultextension = self.canvas.get_default_filetype()
         defaultextension = ''
-        initialdir = rcParams.get('savefig.directory', '')
-        initialdir = os.path.expanduser(initialdir)
+        initialdir = os.path.expanduser(rcParams['savefig.directory'])
         initialfile = self.canvas.get_default_filename()
         fname = tkinter_tkfiledialog.asksaveasfilename(
             master=self.window,
@@ -829,40 +779,26 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
             initialfile=initialfile,
             )
 
-        if fname == "" or fname == ():
+        if fname in ["", ()]:
             return
-        else:
-            if initialdir == '':
-                # explicitly missing key or empty str signals to use cwd
-                rcParams['savefig.directory'] = initialdir
-            else:
-                # save dir for next time
-                rcParams['savefig.directory'] = os.path.dirname(six.text_type(fname))
-            try:
-                # This method will handle the delegation to the correct type
-                self.canvas.print_figure(fname)
-            except Exception as e:
-                tkinter_messagebox.showerror("Error saving file", str(e))
+        # Save dir for next time, unless empty str (i.e., use cwd).
+        if initialdir != "":
+            rcParams['savefig.directory'] = (
+                os.path.dirname(six.text_type(fname)))
+        try:
+            # This method will handle the delegation to the correct type
+            self.canvas.figure.savefig(fname)
+        except Exception as e:
+            tkinter_messagebox.showerror("Error saving file", str(e))
 
     def set_active(self, ind):
         self._ind = ind
-        self._active = [ self._axes[i] for i in self._ind ]
+        self._active = [self._axes[i] for i in self._ind]
 
     def update(self):
         _focus = windowing.FocusManager()
         self._axes = self.canvas.figure.axes
-        naxes = len(self._axes)
-        #if not hasattr(self, "omenu"):
-        #    self.set_active(range(naxes))
-        #    self.omenu = AxisMenu(master=self, naxes=naxes)
-        #else:
-        #    self.omenu.adjust(naxes)
         NavigationToolbar2.update(self)
-
-    def dynamic_update(self):
-        'update drawing area only if idle'
-        # legacy method; new method is canvas.draw_idle
-        self.canvas.draw_idle()
 
 
 class ToolTip(object):
@@ -905,8 +841,7 @@ class ToolTip(object):
         except Tk.TclError:
             pass
         label = Tk.Label(tw, text=self.text, justify=Tk.LEFT,
-                      background="#ffffe0", relief=Tk.SOLID, borderwidth=1,
-                      )
+                         background="#ffffe0", relief=Tk.SOLID, borderwidth=1)
         label.pack(ipadx=1)
 
     def hidetip(self):
@@ -924,20 +859,13 @@ class RubberbandTk(backend_tools.RubberbandBase):
         height = self.figure.canvas.figure.bbox.height
         y0 = height - y0
         y1 = height - y1
-        try:
-            self.lastrect
-        except AttributeError:
-            pass
-        else:
+        if hasattr(self, "lastrect"):
             self.figure.canvas._tkcanvas.delete(self.lastrect)
-        self.lastrect = self.figure.canvas._tkcanvas.create_rectangle(x0, y0, x1, y1)
+        self.lastrect = self.figure.canvas._tkcanvas.create_rectangle(
+            x0, y0, x1, y1)
 
     def remove_rubberband(self):
-        try:
-            self.lastrect
-        except AttributeError:
-            pass
-        else:
+        if hasattr(self, "lastrect"):
             self.figure.canvas._tkcanvas.delete(self.lastrect)
             del self.lastrect
 
@@ -959,8 +887,8 @@ class ToolbarTk(ToolContainerBase, Tk.Frame):
         self.pack(side=Tk.TOP, fill=Tk.X)
         self._groups = {}
 
-    def add_toolitem(self, name, group, position, image_file, description,
-                     toggle):
+    def add_toolitem(
+            self, name, group, position, image_file, description, toggle):
         frame = self._get_groupframe(group)
         button = self._Button(name, image_file, toggle, frame)
         if description is not None:
@@ -1052,8 +980,7 @@ class SaveFigureTk(backend_tools.SaveFigureBase):
         # work - JDH!
         # defaultextension = self.figure.canvas.get_default_filetype()
         defaultextension = ''
-        initialdir = rcParams.get('savefig.directory', '')
-        initialdir = os.path.expanduser(initialdir)
+        initialdir = os.path.expanduser(rcParams['savefig.directory'])
         initialfile = self.figure.canvas.get_default_filename()
         fname = tkinter_tkfiledialog.asksaveasfilename(
             master=self.figure.canvas.manager.window,
@@ -1076,7 +1003,7 @@ class SaveFigureTk(backend_tools.SaveFigureBase):
                     six.text_type(fname))
             try:
                 # This method will handle the delegation to the correct type
-                self.figure.canvas.print_figure(fname)
+                self.figure.savefig(fname)
             except Exception as e:
                 tkinter_messagebox.showerror("Error saving file", str(e))
 
@@ -1114,5 +1041,46 @@ backend_tools.ToolConfigureSubplots = ConfigureSubplotsTk
 backend_tools.ToolSetCursor = SetCursorTk
 backend_tools.ToolRubberband = RubberbandTk
 Toolbar = ToolbarTk
-FigureCanvas = FigureCanvasTkAgg
-FigureManager = FigureManagerTkAgg
+
+
+@_Backend.export
+class _BackendTkAgg(_Backend):
+    FigureCanvas = FigureCanvasTkAgg
+    FigureManager = FigureManagerTkAgg
+
+    @staticmethod
+    def new_figure_manager_given_figure(num, figure):
+        """
+        Create a new figure manager instance for the given figure.
+        """
+        _focus = windowing.FocusManager()
+        window = Tk.Tk(className="matplotlib")
+        window.withdraw()
+
+        # Put a mpl icon on the window rather than the default tk icon.
+        # Tkinter doesn't allow colour icons on linux systems, but tk>=8.5 has
+        # a iconphoto command which we call directly. Source:
+        # http://mail.python.org/pipermail/tkinter-discuss/2006-November/000954.html
+        icon_fname = os.path.join(
+            rcParams['datapath'], 'images', 'matplotlib.ppm')
+        icon_img = Tk.PhotoImage(file=icon_fname)
+        try:
+            window.tk.call('wm', 'foobar', window._w, icon_img)
+        except Exception as exc:
+            # log the failure (due e.g. to Tk version), but carry on
+            verbose.report('Could not load matplotlib icon: %s' % exc)
+
+        canvas = FigureCanvasTkAgg(figure, master=window)
+        manager = FigureManagerTkAgg(canvas, num, window)
+        if matplotlib.is_interactive():
+            manager.show()
+            canvas.draw_idle()
+        return manager
+
+    @staticmethod
+    def trigger_manager_draw(manager):
+        manager.show()
+
+    @staticmethod
+    def mainloop():
+        Tk.mainloop()

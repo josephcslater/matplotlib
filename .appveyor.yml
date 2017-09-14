@@ -14,7 +14,7 @@ environment:
     CMD_IN_ENV: cmd /E:ON /V:ON /C obvci_appveyor_python_build_env.cmd
     # Workaround for https://github.com/conda/conda-build/issues/636
     PYTHONIOENCODING: UTF-8
-    PYTEST_ARGS: -rawR --timeout=300 --durations=25 -n %NUMBER_OF_PROCESSORS% --cov-report= --cov=lib -m "not network"
+    PYTEST_ARGS: -rawR --timeout=300 --durations=25 --cov-report= --cov=lib -m "not network"
     PYTHONHASHSEED: 0  # Workaround for pytest-xdist flaky collection order
                        # https://github.com/pytest-dev/pytest/issues/920
                        # https://github.com/pytest-dev/pytest/issues/1075
@@ -34,18 +34,14 @@ environment:
       CONDA_PY: "35"
       CONDA_NPY: "110"
       PYTHON_VERSION: "3.5"
-      TEST_ALL: "no"
       CONDA_INSTALL_LOCN: "C:\\Miniconda35-x64"
-    - TARGET_ARCH: "x86"
-      CONDA_PY: "27"
-      CONDA_NPY: "18"
-      PYTHON_VERSION: "2.7"
-      # this variable influence pdf/svg and most importantly the latex related tests
-      # which triples the runtime of the tests (7-8min vs 30min).
-      # pick the one which seems to make the most problems and run it last, so that
-      # the rest of the tests can give feedback earlier
-      TEST_ALL: "yes"
-      CONDA_INSTALL_LOCN: "C:\\Miniconda"
+      TEST_ALL: "no"
+    - TARGET_ARCH: "x64"
+      CONDA_PY: "36"
+      PYTHON_VERSION: "3.6"
+      CONDA_NPY: "111"
+      CONDA_INSTALL_LOCN: "C:\\Miniconda36-x64"
+      TEST_ALL: "no"
 
 # We always use a 64-bit machine, but can build x86 distributions
 # with the PYTHON_ARCH variable (which is used by CMD_IN_ENV).
@@ -66,11 +62,9 @@ install:
   - set PATH=%CONDA_INSTALL_LOCN%;%CONDA_INSTALL_LOCN%\scripts;%PATH%;
   - set PYTHONUNBUFFERED=1
   # for obvci_appveyor_python_build_env.cmd
-  - conda install -c pelson/channel/development --yes --quiet obvious-ci
+  - conda install -c conda-forge --yes --quiet obvious-ci
   # for msinttypes and newer stuff
-  # conda-forge may serve outdated versions of certain packages (e.g. conda
-  # itself), so append it to the end of the list.
-  - conda config --append channels conda-forge
+  - conda config --prepend channels conda-forge
   - conda config --set show_channel_urls yes
   - conda config --set always_yes true
   # For building conda packages
@@ -89,12 +83,12 @@ install:
   - conda create -q -n test-environment python=%PYTHON_VERSION%
     pip setuptools numpy python-dateutil freetype=2.6 msinttypes "tk=8.5"
     pyparsing pytz tornado "libpng>=1.6.21,<1.7" "zlib=1.2" "cycler>=0.10"
-    mock sphinx
+    mock sphinx pandas
   - activate test-environment
   - echo %PYTHON_VERSION% %TARGET_ARCH%
   - if %PYTHON_VERSION% == 2.7 conda install -q backports.functools_lru_cache
   # pytest-cov>=2.3.1 due to https://github.com/pytest-dev/pytest-cov/issues/124
-  - pip install -q pytest "pytest-cov>=2.3.1" pytest-rerunfailures pytest-timeout pytest-warnings pytest-xdist
+  - pip install -q pytest "pytest-cov>=2.3.1" pytest-rerunfailures pytest-timeout
 
   # Let the install prefer the static builds of the libs
   - set LIBRARY_LIB=%CONDA_PREFIX%\Library\lib

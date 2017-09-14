@@ -1641,7 +1641,7 @@ class Axis(artist.Artist):
         """
         raise NotImplementedError('Derived must override')
 
-    def _update_offset_text_postion(self, bboxes, bboxes2):
+    def _update_offset_text_position(self, bboxes, bboxes2):
         """
         Update the label position based on the sequence of bounding
         boxes of all the ticklabels
@@ -1702,7 +1702,7 @@ class XAxis(Axis):
     axis_name = 'x'
 
     def contains(self, mouseevent):
-        """Test whether the mouse event occured in the x axis.
+        """Test whether the mouse event occurred in the x axis.
         """
         if callable(self._contains):
             return self._contains(self, mouseevent)

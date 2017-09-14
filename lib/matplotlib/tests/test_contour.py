@@ -132,6 +132,28 @@ def test_contour_shape_invalid_2():
     excinfo.match(r'Input z must be a 2D array.')
 
 
+def test_contour_empty_levels():
+
+    x = np.arange(9)
+    z = np.random.random((9, 9))
+
+    fig, ax = plt.subplots()
+    with pytest.warns(UserWarning) as record:
+        ax.contour(x, x, z, levels=[])
+    assert len(record) == 1
+
+
+def test_contour_uniform_z():
+
+    x = np.arange(9)
+    z = np.ones((9, 9))
+
+    fig, ax = plt.subplots()
+    with pytest.warns(UserWarning) as record:
+        ax.contour(x, x, z)
+    assert len(record) == 1
+
+
 @image_comparison(baseline_images=['contour_manual_labels'])
 def test_contour_manual_labels():
 
@@ -168,21 +190,22 @@ def test_given_colors_levels_and_extends():
     levels = [2, 4, 8, 10]
 
     for i, ax in enumerate(axes.flatten()):
-        plt.sca(ax)
-
         filled = i % 2 == 0.
         extend = ['neither', 'min', 'max', 'both'][i // 2]
 
         if filled:
-            last_color = -1 if extend in ['min', 'max'] else None
-            plt.contourf(data, colors=colors[:last_color], levels=levels,
-                         extend=extend)
+            # If filled, we have 3 colors with no extension,
+            # 4 colors with one extension, and 5 colors with both extensions
+            first_color = 1 if extend in ['max', 'neither'] else None
+            last_color = -1 if extend in ['min', 'neither'] else None
+            c = ax.contourf(data, colors=colors[first_color:last_color],
+                            levels=levels, extend=extend)
         else:
-            last_level = -1 if extend == 'both' else None
-            plt.contour(data, colors=colors, levels=levels[:last_level],
-                        extend=extend)
+            # If not filled, we have 4 levels and 4 colors
+            c = ax.contour(data, colors=colors[:-1],
+                           levels=levels, extend=extend)
 
-        plt.colorbar()
+        plt.colorbar(c, ax=ax)
 
 
 @image_comparison(baseline_images=['contour_datetime_axis'],
@@ -340,3 +363,15 @@ def test_internal_cpp_api():
     with pytest.raises(ValueError) as excinfo:
         qcg.create_filled_contour(1, 0)
     excinfo.match(r'filled contour levels must be increasing')
+
+
+def test_circular_contour_warning():
+    # Check that almost circular contours don't throw a warning
+    with pytest.warns(None) as record:
+        x, y = np.meshgrid(np.linspace(-2, 2, 4), np.linspace(-2, 2, 4))
+        r = np.sqrt(x ** 2 + y ** 2)
+
+        plt.figure()
+        cs = plt.contour(x, y, r)
+        plt.clabel(cs)
+    assert len(record) == 0

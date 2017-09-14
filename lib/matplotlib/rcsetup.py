@@ -279,18 +279,6 @@ def validate_toolbar(s):
     return validator(s)
 
 
-def validate_maskedarray(v):
-    # 2008/12/12: start warning; later, remove all traces of maskedarray
-    try:
-        if v == 'obsolete':
-            return v
-    except ValueError:
-        pass
-    warnings.warn('rcParams key "maskedarray" is obsolete and has no effect;\n'
-                  ' please delete it from your matplotlibrc file',
-                  mplDeprecation)
-
-
 _seq_err_msg = ('You must supply exactly {n} values, you provided {num} '
                 'values: {s}')
 
@@ -365,7 +353,7 @@ def validate_color_for_prop_cycle(s):
         if match is not None:
             raise ValueError('Can not put cycle reference ({cn!r}) in '
                              'prop_cycler'.format(cn=s))
-    elif isinstance(s, six.text_type):
+    elif isinstance(s, six.string_types):
         match = re.match('^C[0-9]$', s)
         if match is not None:
             raise ValueError('Can not put cycle reference ({cn!r}) in '
@@ -397,8 +385,8 @@ def validate_color(s):
         # get rid of grouping symbols
         stmp = ''.join([c for c in s if c.isdigit() or c == '.' or c == ','])
         vals = stmp.split(',')
-        if len(vals) != 3:
-            msg = '\nColor tuples must be length 3'
+        if len(vals) not in [3, 4]:
+            msg = '\nColor tuples must be of length 3 or 4'
         else:
             try:
                 colorarg = [float(val) for val in vals]
@@ -492,13 +480,6 @@ def validate_whiskers(s):
                                  "(float, float)]")
 
 
-def deprecate_savefig_extension(value):
-    warnings.warn("savefig.extension is deprecated.  Use savefig.format "
-                  "instead. Will be removed in 1.4.x",
-                  mplDeprecation)
-    return value
-
-
 def update_savefig_format(value):
     # The old savefig.extension could also have a value of "auto", but
     # the new savefig.format does not.  We need to fix this here.
@@ -576,12 +557,6 @@ def validate_corner_mask(s):
         return validate_bool(s)
 
 
-def validate_tkpythoninspect(s):
-    # Introduced 2010/07/05
-    warnings.warn("tk.pythoninspect is obsolete, and has no effect",
-                  mplDeprecation)
-    return validate_bool(s)
-
 validate_legend_loc = ValidateInStrings(
     'legend_loc',
     ['best',
@@ -627,7 +602,8 @@ validate_movie_writer = ValidateInStrings('animation.writer',
     ['ffmpeg', 'ffmpeg_file',
      'avconv', 'avconv_file',
      'mencoder', 'mencoder_file',
-     'imagemagick', 'imagemagick_file'])
+     'imagemagick', 'imagemagick_file',
+     'html'])
 
 validate_movie_frame_fmt = ValidateInStrings('animation.frame_format',
     ['png', 'jpeg', 'tiff', 'raw', 'rgba'])
@@ -635,7 +611,7 @@ validate_movie_frame_fmt = ValidateInStrings('animation.frame_format',
 validate_axis_locator = ValidateInStrings('major', ['minor', 'both', 'major'])
 
 validate_movie_html_fmt = ValidateInStrings('animation.html',
-    ['html5', 'none'])
+    ['html5', 'jshtml', 'none'])
 
 def validate_bbox(s):
     if isinstance(s, six.string_types):
@@ -880,7 +856,7 @@ def validate_cycler(s):
 
 
 def validate_hist_bins(s):
-    if isinstance(s, six.text_type) and s == 'auto':
+    if isinstance(s, six.string_types) and s == 'auto':
         return s
     try:
         return int(s)
@@ -899,7 +875,7 @@ def validate_animation_writer_path(p):
     # Make sure it's a string and then figure out if the animations
     # are already loaded and reset the writers (which will validate
     # the path on next call)
-    if not isinstance(p, six.text_type):
+    if not isinstance(p, six.string_types):
         raise ValueError("path must be a (unicode) string")
     from sys import modules
     # set dirty, so that the next call to the registry will re-evaluate
@@ -1241,9 +1217,6 @@ defaultParams = {
     'legend.borderaxespad': [0.5, validate_float],
     # the border between the axes and legend edge
     'legend.columnspacing': [2., validate_float],
-    # the relative size of legend markers vs. original
-    'legend.markerscale': [1.0, validate_float],
-    'legend.shadow': [False, validate_bool],
     'legend.facecolor': ['inherit', validate_color_or_inherit],
     'legend.edgecolor': ['0.8', validate_color_or_inherit],
 
@@ -1330,8 +1303,6 @@ defaultParams = {
     'savefig.orientation': ['portrait', validate_orientation],  # edgecolor;
                                                                  #white
     'savefig.jpeg_quality': [95, validate_int],
-    # what to add to extensionless filenames
-    'savefig.extension':  ['png', deprecate_savefig_extension],
     # value checked by backend at runtime
     'savefig.format':     ['png', update_savefig_format],
     # options are 'tight', or 'standard'. 'standard' validates to None.
@@ -1343,7 +1314,6 @@ defaultParams = {
 
     # Maintain shell focus for TkAgg
     'tk.window_focus':  [False, validate_bool],
-    'tk.pythoninspect': [False, validate_tkpythoninspect],  # obsolete
 
     # Set the papersize/type
     'ps.papersize':     ['letter', validate_ps_papersize],
@@ -1410,11 +1380,16 @@ defaultParams = {
 
     # Animation settings
     'animation.html':         ['none', validate_movie_html_fmt],
+    # Limit, in MB, of size of base64 encoded animation in HTML
+    # (i.e. IPython notebook)
+    'animation.embed_limit':  [20, validate_float],
     'animation.writer':       ['ffmpeg', validate_movie_writer],
     'animation.codec':        ['h264', six.text_type],
     'animation.bitrate':      [-1, validate_int],
     # Controls image format when frames are written to disk
     'animation.frame_format': ['png', validate_movie_frame_fmt],
+    # Additional arguments for HTML writer
+    'animation.html_args':    [[], validate_stringlist],
     # Path to FFMPEG binary. If just binary name, subprocess uses $PATH.
     'animation.ffmpeg_path':  ['ffmpeg', validate_animation_writer_path],
 

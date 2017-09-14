@@ -71,22 +71,19 @@ def _get_packed_offsets(wd_list, total, sep, mode="fixed"):
     # d_list is currently not used.
 
     if mode == "fixed":
-        offsets_ = np.add.accumulate([0] + [w + sep for w in w_list])
+        offsets_ = np.cumsum([0] + [w + sep for w in w_list])
         offsets = offsets_[:-1]
-
         if total is None:
             total = offsets_[-1] - sep
-
         return total, offsets
 
     elif mode == "expand":
         if len(w_list) > 1:
             sep = (total - sum(w_list)) / (len(w_list) - 1.)
         else:
-            sep = 0.
-        offsets_ = np.add.accumulate([0] + [w + sep for w in w_list])
+            sep = 0
+        offsets_ = np.cumsum([0] + [w + sep for w in w_list])
         offsets = offsets_[:-1]
-
         return total, offsets
 
     elif mode == "equal":
@@ -94,10 +91,8 @@ def _get_packed_offsets(wd_list, total, sep, mode="fixed"):
         if total is None:
             total = (maxh + sep) * len(w_list)
         else:
-            sep = float(total) / (len(w_list)) - maxh
-
-        offsets = np.array([(maxh + sep) * i for i in range(len(w_list))])
-
+            sep = total / len(w_list) - maxh
+        offsets = (maxh + sep) * np.arange(len(w_list))
         return total, offsets
 
     else:
@@ -1007,13 +1002,13 @@ class AnchoredOffsetbox(OffsetBox):
                  **kwargs):
         """
         loc is a string or an integer specifying the legend location.
-        The valid  location codes are::
+        The valid location codes are::
 
         'upper right'  : 1,
         'upper left'   : 2,
         'lower left'   : 3,
         'lower right'  : 4,
-        'right'        : 5,
+        'right'        : 5, (same as 'center right', for back-compatibility)
         'center left'  : 6,
         'center right' : 7,
         'lower center' : 8,
@@ -1640,7 +1635,7 @@ class DraggableBase(object):
 
     *artist_picker* is a picker method that will be
      used. *finalize_offset* is called when the mouse is released. In
-     current implementaion of DraggableLegend and DraggableAnnotation,
+     current implementation of DraggableLegend and DraggableAnnotation,
      *update_offset* places the artists simply in display
      coordinates. And *finalize_offset* recalculate their position in
      the normalized axes coordinate and set a relavant attribute.

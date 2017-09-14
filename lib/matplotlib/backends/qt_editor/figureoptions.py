@@ -47,17 +47,18 @@ def figure_edit(axes, parent=None):
     sep = (None, None)  # separator
 
     # Get / General
+    # Cast to builtin floats as they have nicer reprs.
     xmin, xmax = map(float, axes.get_xlim())
     ymin, ymax = map(float, axes.get_ylim())
     general = [('Title', axes.get_title()),
                sep,
                (None, "<b>X-Axis</b>"),
-               ('Min', xmin), ('Max', xmax),
+               ('Left', xmin), ('Right', xmax),
                ('Label', axes.get_xlabel()),
                ('Scale', [axes.get_xscale(), 'linear', 'log', 'logit']),
                sep,
                (None, "<b>Y-Axis</b>"),
-               ('Min', ymin), ('Max', ymax),
+               ('Bottom', ymin), ('Top', ymax),
                ('Label', axes.get_ylabel()),
                ('Scale', [axes.get_yscale(), 'linear', 'log', 'logit']),
                sep,
@@ -117,8 +118,12 @@ def figure_edit(axes, parent=None):
         color = mcolors.to_hex(
             mcolors.to_rgba(line.get_color(), line.get_alpha()),
             keep_alpha=True)
-        ec = mcolors.to_hex(line.get_markeredgecolor(), keep_alpha=True)
-        fc = mcolors.to_hex(line.get_markerfacecolor(), keep_alpha=True)
+        ec = mcolors.to_hex(
+            mcolors.to_rgba(line.get_markeredgecolor(), line.get_alpha()),
+            keep_alpha=True)
+        fc = mcolors.to_hex(
+            mcolors.to_rgba(line.get_markerfacecolor(), line.get_alpha()),
+            keep_alpha=True)
         curvedata = [
             ('Label', label),
             sep,
@@ -173,6 +178,9 @@ def figure_edit(axes, parent=None):
 
     def apply_callback(data):
         """This function will be called to apply changes"""
+        orig_xlim = axes.get_xlim()
+        orig_ylim = axes.get_ylim()
+
         general = data.pop(0)
         curves = data.pop(0) if has_curve else []
         images = data.pop(0) if has_image else []
@@ -244,6 +252,8 @@ def figure_edit(axes, parent=None):
         # Redraw
         figure = axes.get_figure()
         figure.canvas.draw()
+        if not (axes.get_xlim() == orig_xlim and axes.get_ylim() == orig_ylim):
+            figure.canvas.toolbar.push_current()
 
     data = formlayout.fedit(datalist, title="Figure options", parent=parent,
                             icon=get_icon('qt4_editor_options.svg'),

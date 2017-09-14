@@ -1,34 +1,38 @@
-# axes3d.py, original mplot3d version by John Porter
-# Created: 23 Sep 2005
-# Parts fixed by Reinier Heeres <reinier@heeres.eu>
-# Minor additions by Ben Axelrod <baxelrod@coroware.com>
-# Significant updates and revisions by Ben Root <ben.v.root@gmail.com>
-
 """
+axes3d.py, original mplot3d version by John Porter
+Created: 23 Sep 2005
+
+Parts fixed by Reinier Heeres <reinier@heeres.eu>
+Minor additions by Ben Axelrod <baxelrod@coroware.com>
+Significant updates and revisions by Ben Root <ben.v.root@gmail.com>
+
 Module containing Axes3D, an object which can plot 3D objects on a
 2D matplotlib figure.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import math
 
 import six
 from six.moves import map, xrange, zip, reduce
 
+import math
 import warnings
+from collections import defaultdict
 
 import numpy as np
+
 import matplotlib.axes as maxes
-from matplotlib.axes import Axes, rcParams
-from matplotlib import cbook
-import matplotlib.transforms as mtransforms
-from matplotlib.transforms import Bbox
+import matplotlib.cbook as cbook
 import matplotlib.collections as mcoll
-from matplotlib import docstring
+import matplotlib.colors as mcolors
+import matplotlib.docstring as docstring
 import matplotlib.scale as mscale
-from matplotlib.tri.triangulation import Triangulation
-from matplotlib import colors as mcolors
+import matplotlib.transforms as mtransforms
+from matplotlib.axes import Axes, rcParams
+from matplotlib.cbook import _backports
 from matplotlib.colors import Normalize, LightSource
+from matplotlib.transforms import Bbox
+from matplotlib.tri.triangulation import Triangulation
 
 from . import art3d
 from . import proj3d
@@ -107,13 +111,13 @@ class Axes3D(Axes):
         # func used to format z -- fall back on major formatters
         self.fmt_zdata = None
 
-        if zscale is not None :
+        if zscale is not None:
             self.set_zscale(zscale)
 
-        if self.zaxis is not None :
-            self._zcid = self.zaxis.callbacks.connect('units finalize',
-                                                      self.relim)
-        else :
+        if self.zaxis is not None:
+            self._zcid = self.zaxis.callbacks.connect(
+                'units finalize', lambda: self._on_units_changed(scalez=True))
+        else:
             self._zcid = None
 
         self._ready = 1
@@ -304,6 +308,15 @@ class Axes3D(Axes):
         zhigh = tc[0][2] > tc[2][2]
         return xhigh, yhigh, zhigh
 
+    def _on_units_changed(self, scalex=False, scaley=False, scalez=False):
+        """
+        Callback for processing changes to axis units.
+
+        Currently forces updates of data limits and view limits.
+        """
+        self.relim()
+        self.autoscale_view(scalex=scalex, scaley=scaley, scalez=scalez)
+
     def update_datalim(self, xys, **kwargs):
         pass
 
@@ -469,7 +482,7 @@ class Axes3D(Axes):
                                          scalez=scalez)
 
     def auto_scale_xyz(self, X, Y, Z=None, had_data=None):
-        x, y, z = list(map(np.asarray, (X, Y, Z)))
+        x, y, z = map(np.asarray, (X, Y, Z))
         try:
             x, y = x.flatten(), y.flatten()
             if Z is not None:
@@ -1535,8 +1548,7 @@ class Axes3D(Axes):
         zdir = kwargs.pop('zdir', 'z')
 
         # Match length
-        if not cbook.iterable(zs):
-            zs = np.ones(len(xs)) * zs
+        zs = _backports.broadcast_to(zs, len(xs))
 
         lines = super(Axes3D, self).plot(xs, ys, *args, **kwargs)
         for line in lines:
@@ -2266,7 +2278,7 @@ class Axes3D(Axes):
 
         Supported are:
             - PolyCollection
-            - LineColleciton
+            - LineCollection
             - PatchCollection
         '''
         zvals = np.atleast_1d(zs)
@@ -2331,29 +2343,16 @@ class Axes3D(Axes):
 
         had_data = self.has_data()
 
-        xs = np.ma.ravel(xs)
-        ys = np.ma.ravel(ys)
-        zs = np.ma.ravel(zs)
-        if xs.size != ys.size:
-            raise ValueError("Arguments 'xs' and 'ys' must be of same size.")
-        if xs.size != zs.size:
-            if zs.size == 1:
-                zs = np.tile(zs[0], xs.size)
-            else:
-                raise ValueError(("Argument 'zs' must be of same size as 'xs' "
-                    "and 'ys' or of size 1."))
-
+        xs, ys, zs = np.broadcast_arrays(
+            *[np.ravel(np.ma.filled(t, np.nan)) for t in [xs, ys, zs]])
         s = np.ma.ravel(s)  # This doesn't have to match x, y in size.
 
         xs, ys, zs, s, c = cbook.delete_masked_points(xs, ys, zs, s, c)
 
-        patches = super(Axes3D, self).scatter(xs, ys, s=s, c=c, *args,
-                                              **kwargs)
-        if not cbook.iterable(zs):
-            is_2d = True
-            zs = np.ones(len(xs)) * zs
-        else:
-            is_2d = False
+        patches = super(Axes3D, self).scatter(
+            xs, ys, s=s, c=c, *args, **kwargs)
+        is_2d = not cbook.iterable(zs)
+        zs = _backports.broadcast_to(zs, len(xs))
         art3d.patch_collection_2d_to_3d(patches, zs=zs, zdir=zdir,
                                         depthshade=depthshade)
 
@@ -2392,8 +2391,7 @@ class Axes3D(Axes):
 
         patches = super(Axes3D, self).bar(left, height, *args, **kwargs)
 
-        if not cbook.iterable(zs):
-            zs = np.ones(len(left)) * zs
+        zs = _backports.broadcast_to(zs, len(left))
 
         verts = []
         verts_zs = []
@@ -2475,43 +2473,17 @@ class Axes3D(Axes):
 
         had_data = self.has_data()
 
-        if not cbook.iterable(x):
-            x = [x]
-        if not cbook.iterable(y):
-            y = [y]
-        if not cbook.iterable(z):
-            z = [z]
-
-        if not cbook.iterable(dx):
-            dx = [dx]
-        if not cbook.iterable(dy):
-            dy = [dy]
-        if not cbook.iterable(dz):
-            dz = [dz]
-
-        if len(dx) == 1:
-            dx = dx * len(x)
-        if len(dy) == 1:
-            dy = dy * len(y)
-        if len(dz) == 1:
-            dz = dz * len(z)
-
-        if len(x) != len(y) or len(x) != len(z):
-            warnings.warn('x, y, and z must be the same length.')
-
-        # FIXME: This is archaic and could be done much better.
-        minx, miny, minz = 1e20, 1e20, 1e20
-        maxx, maxy, maxz = -1e20, -1e20, -1e20
+        x, y, z, dx, dy, dz = np.broadcast_arrays(
+            np.atleast_1d(x), y, z, dx, dy, dz)
+        minx = np.min(x)
+        maxx = np.max(x + dx)
+        miny = np.min(y)
+        maxy = np.max(y + dy)
+        minz = np.min(z)
+        maxz = np.max(z + dz)
 
         polys = []
         for xi, yi, zi, dxi, dyi, dzi in zip(x, y, z, dx, dy, dz):
-            minx = min(xi, minx)
-            maxx = max(xi + dxi, maxx)
-            miny = min(yi, miny)
-            maxy = max(yi + dyi, maxy)
-            minz = min(zi, minz)
-            maxz = max(zi + dzi, maxz)
-
             polys.extend([
                 ((xi, yi, zi), (xi + dxi, yi, zi),
                     (xi + dxi, yi + dyi, zi), (xi, yi + dyi, zi)),
@@ -2742,6 +2714,213 @@ class Axes3D(Axes):
         return linec
 
     quiver3D = quiver
+
+    def voxels(self, *args, **kwargs):
+        """
+        ax.voxels([x, y, z,] /, filled, **kwargs)
+
+        Plot a set of filled voxels
+
+        All voxels are plotted as 1x1x1 cubes on the axis, with filled[0,0,0]
+        placed with its lower corner at the origin. Occluded faces are not
+        plotted.
+
+        Call signatures::
+
+            voxels(filled, facecolors=fc, edgecolors=ec, **kwargs)
+            voxels(x, y, z, filled, facecolors=fc, edgecolors=ec, **kwargs)
+
+        .. versionadded:: 2.1
+
+        Parameters
+        ----------
+        filled : 3D np.array of bool
+            A 3d array of values, with truthy values indicating which voxels
+            to fill
+
+        x, y, z : 3D np.array, optional
+            The coordinates of the corners of the voxels. This should broadcast
+            to a shape one larger in every dimension than the shape of `filled`.
+            These can be used to plot non-cubic voxels.
+
+            If not specified, defaults to increasing integers along each axis,
+            like those returned by :func:`~numpy.indices`.
+            As indicated by the ``/`` in the function signature, these arguments
+            can only be passed positionally.
+
+        facecolors, edgecolors : array_like, optional
+            The color to draw the faces and edges of the voxels. Can only be
+            passed as keyword arguments.
+            This parameter can be:
+
+              - A single color value, to color all voxels the same color. This
+                can be either a string, or a 1D rgb/rgba array
+              - ``None``, the default, to use a single color for the faces, and
+                the style default for the edges.
+              - A 3D ndarray of color names, with each item the color for the
+                corresponding voxel. The size must match the voxels.
+              - A 4D ndarray of rgb/rgba data, with the components along the
+                last axis.
+
+        **kwargs
+            Additional keyword arguments to pass onto
+            :func:`~mpl_toolkits.mplot3d.art3d.Poly3DCollection`
+
+        Returns
+        -------
+        faces : dict
+            A dictionary indexed by coordinate, where ``faces[i,j,k]`` is a
+            `Poly3DCollection` of the faces drawn for the voxel
+            ``filled[i,j,k]``. If no faces were drawn for a given voxel, either
+            because it was not asked to be drawn, or it is fully occluded, then
+            ``(i,j,k) not in faces``.
+
+        Examples
+        --------
+        .. plot:: gallery/mplot3d/voxels.py
+        .. plot:: gallery/mplot3d/voxels_rgb.py
+        .. plot:: gallery/mplot3d/voxels_torus.py
+        .. plot:: gallery/mplot3d/voxels_numpy_logo.py
+        """
+
+        # work out which signature we should be using, and use it to parse
+        # the arguments. Name must be voxels for the correct error message
+        if len(args) >= 3:
+            # underscores indicate position only
+            def voxels(__x, __y, __z, filled, **kwargs):
+                return (__x, __y, __z), filled, kwargs
+        else:
+            def voxels(filled, **kwargs):
+                return None, filled, kwargs
+
+        xyz, filled, kwargs = voxels(*args, **kwargs)
+
+        # check dimensions
+        if filled.ndim != 3:
+            raise ValueError("Argument filled must be 3-dimensional")
+        size = np.array(filled.shape, dtype=np.intp)
+
+        # check xyz coordinates, which are one larger than the filled shape
+        coord_shape = tuple(size + 1)
+        if xyz is None:
+            x, y, z = np.indices(coord_shape)
+        else:
+            x, y, z = (_backports.broadcast_to(c, coord_shape) for c in xyz)
+
+        def _broadcast_color_arg(color, name):
+            if np.ndim(color) in (0, 1):
+                # single color, like "red" or [1, 0, 0]
+                return _backports.broadcast_to(
+                    color, filled.shape + np.shape(color))
+            elif np.ndim(color) in (3, 4):
+                # 3D array of strings, or 4D array with last axis rgb
+                if np.shape(color)[:3] != filled.shape:
+                    raise ValueError(
+                        "When multidimensional, {} must match the shape of "
+                        "filled".format(name))
+                return color
+            else:
+                raise ValueError("Invalid {} argument".format(name))
+
+        # intercept the facecolors, handling defaults and broacasting
+        facecolors = kwargs.pop('facecolors', None)
+        if facecolors is None:
+            facecolors = self._get_patches_for_fill.get_next_color()
+        facecolors = _broadcast_color_arg(facecolors, 'facecolors')
+
+        # broadcast but no default on edgecolors
+        edgecolors = kwargs.pop('edgecolors', None)
+        edgecolors = _broadcast_color_arg(edgecolors, 'edgecolors')
+
+        # always scale to the full array, even if the data is only in the center
+        self.auto_scale_xyz(x, y, z)
+
+        # points lying on corners of a square
+        square = np.array([
+            [0, 0, 0],
+            [0, 1, 0],
+            [1, 1, 0],
+            [1, 0, 0]
+        ], dtype=np.intp)
+
+        voxel_faces = defaultdict(list)
+
+        def permutation_matrices(n):
+            """ Generator of cyclic permutation matices """
+            mat = np.eye(n, dtype=np.intp)
+            for i in range(n):
+                yield mat
+                mat = np.roll(mat, 1, axis=0)
+
+        # iterate over each of the YZ, ZX, and XY orientations, finding faces to
+        # render
+        for permute in permutation_matrices(3):
+            # find the set of ranges to iterate over
+            pc, qc, rc = permute.T.dot(size)
+            pinds = np.arange(pc)
+            qinds = np.arange(qc)
+            rinds = np.arange(rc)
+
+            square_rot = square.dot(permute.T)
+
+            # iterate within the current plane
+            for p in pinds:
+                for q in qinds:
+                    # iterate perpendicularly to the current plane, handling
+                    # boundaries. We only draw faces between a voxel and an
+                    # empty space, to avoid drawing internal faces.
+
+                    # draw lower faces
+                    p0 = permute.dot([p, q, 0])
+                    i0 = tuple(p0)
+                    if filled[i0]:
+                        voxel_faces[i0].append(p0 + square_rot)
+
+                    # draw middle faces
+                    for r1, r2 in zip(rinds[:-1], rinds[1:]):
+                        p1 = permute.dot([p, q, r1])
+                        p2 = permute.dot([p, q, r2])
+
+                        i1 = tuple(p1)
+                        i2 = tuple(p2)
+
+                        if filled[i1] and not filled[i2]:
+                            voxel_faces[i1].append(p2 + square_rot)
+                        elif not filled[i1] and filled[i2]:
+                            voxel_faces[i2].append(p2 + square_rot)
+
+                    # draw upper faces
+                    pk = permute.dot([p, q, rc-1])
+                    pk2 = permute.dot([p, q, rc])
+                    ik = tuple(pk)
+                    if filled[ik]:
+                        voxel_faces[ik].append(pk2 + square_rot)
+
+        # iterate over the faces, and generate a Poly3DCollection for each voxel
+        polygons = {}
+        for coord, faces_inds in voxel_faces.items():
+            # convert indices into 3D positions
+            if xyz is None:
+                faces = faces_inds
+            else:
+                faces = []
+                for face_inds in faces_inds:
+                    ind = face_inds[:, 0], face_inds[:, 1], face_inds[:, 2]
+                    face = np.empty(face_inds.shape)
+                    face[:, 0] = x[ind]
+                    face[:, 1] = y[ind]
+                    face[:, 2] = z[ind]
+                    faces.append(face)
+
+            poly = art3d.Poly3DCollection(faces,
+                facecolors=facecolors[coord],
+                edgecolors=edgecolors[coord],
+                **kwargs
+            )
+            self.add_collection3d(poly)
+            polygons[coord] = poly
+
+        return polygons
 
 
 def get_test_data(delta=0.05):

@@ -339,7 +339,8 @@ def test_multi_color_hatch():
         ax.add_patch(r)
 
 
-@image_comparison(baseline_images=['polar_proj'], extensions=['png'])
+@image_comparison(baseline_images=['polar_proj'], extensions=['png'],
+                  style='default')
 def test_adding_rectangle_patch_with_polar_projection():
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
@@ -351,3 +352,16 @@ def test_adding_rectangle_patch_with_polar_projection():
         )
     )
     ax.set_rmax(2)
+
+
+@image_comparison(baseline_images=['units_rectangle'], extensions=['png'])
+def test_units_rectangle():
+    import matplotlib.testing.jpl_units as U
+    U.register()
+
+    p = mpatches.Rectangle((5*U.km, 6*U.km), 1*U.km, 2*U.km)
+
+    fig, ax = plt.subplots()
+    ax.add_patch(p)
+    ax.set_xlim([4*U.km, 7*U.km])
+    ax.set_ylim([5*U.km, 9*U.km])

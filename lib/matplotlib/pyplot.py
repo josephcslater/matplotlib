@@ -294,7 +294,7 @@ def pause(interval):
         if figManager is not None:
             canvas = figManager.canvas
             if canvas.figure.stale:
-                canvas.draw()
+                canvas.draw_idle()
             show(block=False)
             canvas.start_event_loop(interval)
             return
@@ -361,7 +361,7 @@ def setp(*args, **kwargs):
 
 def xkcd(scale=1, length=100, randomness=2):
     """
-    Turns on `xkcd <http://xkcd.com/>`_ sketch-style drawing mode.
+    Turns on `xkcd <https://xkcd.com/>`_ sketch-style drawing mode.
     This will only have effect on things drawn after this function is
     called.
 
@@ -1833,6 +1833,7 @@ def get_plot_commands():
     return sorted(commands)
 
 
+@deprecated('2.1')
 def colors():
     """
     This is a do-nothing function to provide you with help on how
@@ -1919,66 +1920,17 @@ def colormaps():
       for nominal data that has no inherent ordering, where color is used
       only to distinguish categories
 
-    The base colormaps are derived from those of the same name provided
-    with Matlab:
+    Matplotlib ships with 4 perceptually uniform color maps which are
+    the recommended color maps for sequential data:
 
-      =========   =======================================================
+      =========   ===================================================
       Colormap    Description
-      =========   =======================================================
-      autumn      sequential linearly-increasing shades of red-orange-yellow
-      bone        sequential increasing black-white color map with
-                  a tinge of blue, to emulate X-ray film
-      cool        linearly-decreasing shades of cyan-magenta
-      copper      sequential increasing shades of black-copper
-      flag        repetitive red-white-blue-black pattern (not cyclic at
-                  endpoints)
-      gray        sequential linearly-increasing black-to-white
-                  grayscale
-      hot         sequential black-red-yellow-white, to emulate blackbody
-                  radiation from an object at increasing temperatures
-      hsv         cyclic red-yellow-green-cyan-blue-magenta-red, formed
-                  by changing the hue component in the HSV color space
+      =========   ===================================================
       inferno     perceptually uniform shades of black-red-yellow
-      jet         a spectral map with dark endpoints, blue-cyan-yellow-red;
-                  based on a fluid-jet simulation by NCSA [#]_
       magma       perceptually uniform shades of black-red-white
-      pink        sequential increasing pastel black-pink-white, meant
-                  for sepia tone colorization of photographs
       plasma      perceptually uniform shades of blue-red-yellow
-      prism       repetitive red-yellow-green-blue-purple-...-green pattern
-                  (not cyclic at endpoints)
-      spring      linearly-increasing shades of magenta-yellow
-      summer      sequential linearly-increasing shades of green-yellow
       viridis     perceptually uniform shades of blue-green-yellow
-      winter      linearly-increasing shades of blue-green
-      =========   =======================================================
-
-    For the above list only, you can also set the colormap using the
-    corresponding pylab shortcut interface function, similar to Matlab::
-
-      imshow(X)
-      hot()
-      jet()
-
-    The next set of palettes are from the `Yorick scientific visualisation
-    package <http://dhmunro.github.io/yorick-doc/>`_, an evolution of
-    the GIST package, both by David H. Munro:
-
-      ============  =======================================================
-      Colormap      Description
-      ============  =======================================================
-      gist_earth    mapmaker's colors from dark blue deep ocean to green
-                    lowlands to brown highlands to white mountains
-      gist_heat     sequential increasing black-red-orange-white, to emulate
-                    blackbody radiation from an iron bar as it grows hotter
-      gist_ncar     pseudo-spectral black-blue-green-yellow-red-purple-white
-                    colormap from National Center for Atmospheric
-                    Research [#]_
-      gist_rainbow  runs through the colors in spectral order from red to
-                    violet at full saturation (like *hsv* but not cyclic)
-      gist_stern    "Stern special" color table from Interactive Data
-                    Language software
-      ============  =======================================================
+      =========   ===================================================
 
     The following colormaps are based on the `ColorBrewer
     <http://colorbrewer2.org>`_ color specifications and designs developed by
@@ -2041,6 +1993,57 @@ def colormaps():
     * Set2
     * Set3
 
+    A set of colormaps derived from those of the same name provided
+    with Matlab are also included:
+
+      =========   =======================================================
+      Colormap    Description
+      =========   =======================================================
+      autumn      sequential linearly-increasing shades of red-orange-yellow
+      bone        sequential increasing black-white color map with
+                  a tinge of blue, to emulate X-ray film
+      cool        linearly-decreasing shades of cyan-magenta
+      copper      sequential increasing shades of black-copper
+      flag        repetitive red-white-blue-black pattern (not cyclic at
+                  endpoints)
+      gray        sequential linearly-increasing black-to-white
+                  grayscale
+      hot         sequential black-red-yellow-white, to emulate blackbody
+                  radiation from an object at increasing temperatures
+      hsv         cyclic red-yellow-green-cyan-blue-magenta-red, formed
+                  by changing the hue component in the HSV color space
+      jet         a spectral map with dark endpoints, blue-cyan-yellow-red;
+                  based on a fluid-jet simulation by NCSA [#]_
+      pink        sequential increasing pastel black-pink-white, meant
+                  for sepia tone colorization of photographs
+      prism       repetitive red-yellow-green-blue-purple-...-green pattern
+                  (not cyclic at endpoints)
+      spring      linearly-increasing shades of magenta-yellow
+      summer      sequential linearly-increasing shades of green-yellow
+      winter      linearly-increasing shades of blue-green
+      =========   =======================================================
+
+    A set of palettes from the `Yorick scientific visualisation
+    package <https://dhmunro.github.io/yorick-doc/>`_, an evolution of
+    the GIST package, both by David H. Munro are included:
+
+      ============  =======================================================
+      Colormap      Description
+      ============  =======================================================
+      gist_earth    mapmaker's colors from dark blue deep ocean to green
+                    lowlands to brown highlands to white mountains
+      gist_heat     sequential increasing black-red-orange-white, to emulate
+                    blackbody radiation from an iron bar as it grows hotter
+      gist_ncar     pseudo-spectral black-blue-green-yellow-red-purple-white
+                    colormap from National Center for Atmospheric
+                    Research [#]_
+      gist_rainbow  runs through the colors in spectral order from red to
+                    violet at full saturation (like *hsv* but not cyclic)
+      gist_stern    "Stern special" color table from Interactive Data
+                    Language software
+      ============  =======================================================
+
+
     Other miscellaneous schemes:
 
       ============= =======================================================
@@ -2101,14 +2104,14 @@ def colormaps():
 
     .. [#] Resembles "BkBlAqGrYeOrReViWh200" from NCAR Command
       Language. See `Color Table Gallery
-      <http://www.ncl.ucar.edu/Document/Graphics/color_table_gallery.shtml>`_
+      <https://www.ncl.ucar.edu/Document/Graphics/color_table_gallery.shtml>`_
 
     .. [#] See `Diverging Color Maps for Scientific Visualization
       <http://www.kennethmoreland.com/color-maps/>`_ by Kenneth Moreland.
 
     .. [#] See `A Color Map for Effective Black-and-White Rendering of
       Color-Scale Images
-      <http://www.mathworks.com/matlabcentral/fileexchange/2662-cmrmap-m>`_
+      <https://www.mathworks.com/matlabcentral/fileexchange/2662-cmrmap-m>`_
       by Carey Rappaport
 
     .. [#] Changed to distinguish from ColorBrewer's *Spectral* map.
@@ -2312,7 +2315,7 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
              comments='#', skiprows=0, checkrows=5, delimiter=',',
              names=None, subplots=True, newfig=True, **kwargs):
     """
-    Plot the data in in a file.
+    Plot the data in a file.
 
     *cols* is a sequence of column identifiers to plot.  An identifier
     is either an int or a string.  If it is an int, it indicates the
@@ -2619,20 +2622,19 @@ def axvspan(xmin, xmax, ymin=0, ymax=1, hold=None, **kwargs):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.bar)
-def bar(left, height, width=0.8, bottom=None, hold=None, data=None, **kwargs):
+def bar(*args, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
     washold = ax._hold
-
+    hold = kwargs.pop('hold', None)
     if hold is not None:
         ax._hold = hold
         from matplotlib.cbook import mplDeprecation
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.bar(left, height, width=width, bottom=bottom, data=data,
-                     **kwargs)
+        ret = ax.bar(*args, **kwargs)
     finally:
         ax._hold = washold
 
@@ -2641,19 +2643,19 @@ def bar(left, height, width=0.8, bottom=None, hold=None, data=None, **kwargs):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.barh)
-def barh(bottom, width, height=0.8, left=None, hold=None, **kwargs):
+def barh(*args, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
     washold = ax._hold
-
+    hold = kwargs.pop('hold', None)
     if hold is not None:
         ax._hold = hold
         from matplotlib.cbook import mplDeprecation
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.barh(bottom, width, height=height, left=left, **kwargs)
+        ret = ax.barh(*args, **kwargs)
     finally:
         ax._hold = washold
 
@@ -2990,10 +2992,10 @@ def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear',
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.hist)
-def hist(x, bins=None, range=None, normed=False, weights=None, cumulative=False,
+def hist(x, bins=None, range=None, density=None, weights=None, cumulative=False,
          bottom=None, histtype='bar', align='mid', orientation='vertical',
          rwidth=None, log=False, color=None, label=None, stacked=False,
-         hold=None, data=None, **kwargs):
+         normed=None, hold=None, data=None, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
@@ -3005,11 +3007,11 @@ def hist(x, bins=None, range=None, normed=False, weights=None, cumulative=False,
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.hist(x, bins=bins, range=range, normed=normed,
+        ret = ax.hist(x, bins=bins, range=range, density=density,
                       weights=weights, cumulative=cumulative, bottom=bottom,
                       histtype=histtype, align=align, orientation=orientation,
                       rwidth=rwidth, log=log, color=color, label=label,
-                      stacked=stacked, data=data, **kwargs)
+                      stacked=stacked, normed=normed, data=data, **kwargs)
     finally:
         ax._hold = washold
 

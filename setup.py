@@ -125,7 +125,6 @@ classifiers = [
     'Programming Language :: Python',
     'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.3',
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
@@ -282,14 +281,6 @@ if __name__ == '__main__':
         ext_modules=ext_modules,
         package_dir=package_dir,
         package_data=package_data,
-        include_package_data=True,
-        data_files=[
-            ('share/jupyter/nbextensions/matplotlib', [
-                'lib/matplotlib/backends/web_backend/js/extension.js',
-                'lib/matplotlib/backends/web_backend/js/nbagg_mpl.js',
-                'lib/matplotlib/backends/web_backend/js/mpl.js',
-            ]),
-        ],
         classifiers=classifiers,
         download_url="http://matplotlib.org/users/installing.html",
 

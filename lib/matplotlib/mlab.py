@@ -727,12 +727,12 @@ def _spectral_helper(x, y=None, NFFT=None, Fs=None, detrend_func=None,
     elif mode == 'psd':
         result = np.conj(result) * result
     elif mode == 'magnitude':
-        result = np.abs(result)
+        result = np.abs(result) / np.abs(windowVals).sum()
     elif mode == 'angle' or mode == 'phase':
         # we unwrap the phase later to handle the onesided vs. twosided case
         result = np.angle(result)
     elif mode == 'complex':
-        pass
+        result /= np.abs(windowVals).sum()
 
     if mode == 'psd':
 
@@ -2236,8 +2236,8 @@ def binary_repr(number, max_length=1025):
     """
 
 #   assert number < 2L << max_length
-    shifts = list(map(operator.rshift, max_length * [number],
-                  range(max_length - 1, -1, -1)))
+    shifts = map(operator.rshift, max_length * [number],
+                 range(max_length - 1, -1, -1))
     digits = list(map(operator.mod, shifts, max_length * [2]))
     if not digits.count(1):
         return 0
@@ -3136,17 +3136,17 @@ def rec2txt(r, header=None, padding=3, precision=3, fields=None):
     def get_justify(colname, column, precision):
         ntype = column.dtype
 
-        if np.issubdtype(ntype, str) or np.issubdtype(ntype, bytes):
+        if np.issubdtype(ntype, np.character):
             fixed_width = int(ntype.str[2:])
             length = max(len(colname), fixed_width)
             return 0, length+padding, "%s"  # left justify
 
-        if np.issubdtype(ntype, np.int):
+        if np.issubdtype(ntype, np.integer):
             length = max(len(colname),
                          np.max(list(map(len, list(map(str, column))))))
             return 1, length+padding, "%d"  # right justify
 
-        if np.issubdtype(ntype, np.float):
+        if np.issubdtype(ntype, np.floating):
             fmt = "%." + str(precision) + "f"
             length = max(
                 len(colname),
@@ -3751,7 +3751,7 @@ def inside_poly(points, verts):
     # Make a closed polygon path
     poly = Path(verts)
 
-    # Check to see which points are contained withing the Path
+    # Check to see which points are contained within the Path
     return [idx for idx, p in enumerate(points) if poly.contains_point(p)]
 
 
@@ -3881,7 +3881,6 @@ def cross_from_below(x, threshold):
 
     """
     x = np.asarray(x)
-    threshold = threshold
     ind = np.nonzero((x[:-1] < threshold) & (x[1:] >= threshold))[0]
     if len(ind):
         return ind+1

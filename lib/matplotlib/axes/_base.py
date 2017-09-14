@@ -414,7 +414,8 @@ class _AxesBase(martist.Artist):
     _shared_y_axes = cbook.Grouper()
 
     def __str__(self):
-        return "Axes(%g,%g;%gx%g)" % tuple(self._position.bounds)
+        return "{0}({1[0]:g},{1[1]:g};{1[2]:g}x{1[3]:g})".format(
+            type(self).__name__, self._position.bounds)
 
     def __init__(self, fig, rect,
                  facecolor=None,  # defaults to rc axes.facecolor
@@ -555,12 +556,12 @@ class _AxesBase(martist.Artist):
             self.update(kwargs)
 
         if self.xaxis is not None:
-            self._xcid = self.xaxis.callbacks.connect('units finalize',
-                                                      self.relim)
+            self._xcid = self.xaxis.callbacks.connect(
+                'units finalize', lambda: self._on_units_changed(scalex=True))
 
         if self.yaxis is not None:
-            self._ycid = self.yaxis.callbacks.connect('units finalize',
-                                                      self.relim)
+            self._ycid = self.yaxis.callbacks.connect(
+                'units finalize', lambda: self._on_units_changed(scaley=True))
 
         self.tick_params(
             top=rcParams['xtick.top'] and rcParams['xtick.minor.top'],
@@ -980,21 +981,8 @@ class _AxesBase(martist.Artist):
             self.xaxis.minor = self._sharex.xaxis.minor
             x0, x1 = self._sharex.get_xlim()
             self.set_xlim(x0, x1, emit=False, auto=None)
-
-            # Save the current formatter/locator so we don't lose it
-            majf = self._sharex.xaxis.get_major_formatter()
-            minf = self._sharex.xaxis.get_minor_formatter()
-            majl = self._sharex.xaxis.get_major_locator()
-            minl = self._sharex.xaxis.get_minor_locator()
-
-            # This overwrites the current formatter/locator
-            self.xaxis._set_scale(self._sharex.xaxis.get_scale())
-
-            # Reset the formatter/locator
-            self.xaxis.set_major_formatter(majf)
-            self.xaxis.set_minor_formatter(minf)
-            self.xaxis.set_major_locator(majl)
-            self.xaxis.set_minor_locator(minl)
+            self.xaxis._scale = mscale.scale_factory(
+                    self._sharex.xaxis.get_scale(), self.xaxis)
         else:
             self.xaxis._set_scale('linear')
             try:
@@ -1007,21 +995,8 @@ class _AxesBase(martist.Artist):
             self.yaxis.minor = self._sharey.yaxis.minor
             y0, y1 = self._sharey.get_ylim()
             self.set_ylim(y0, y1, emit=False, auto=None)
-
-            # Save the current formatter/locator so we don't lose it
-            majf = self._sharey.yaxis.get_major_formatter()
-            minf = self._sharey.yaxis.get_minor_formatter()
-            majl = self._sharey.yaxis.get_major_locator()
-            minl = self._sharey.yaxis.get_minor_locator()
-
-            # This overwrites the current formatter/locator
-            self.yaxis._set_scale(self._sharey.yaxis.get_scale())
-
-            # Reset the formatter/locator
-            self.yaxis.set_major_formatter(majf)
-            self.yaxis.set_minor_formatter(minf)
-            self.yaxis.set_major_locator(majl)
-            self.yaxis.set_minor_locator(minl)
+            self.yaxis._scale = mscale.scale_factory(
+                    self._sharey.yaxis.get_scale(), self.yaxis)
         else:
             self.yaxis._set_scale('linear')
             try:
@@ -1916,6 +1891,15 @@ class _AxesBase(martist.Artist):
         container.set_remove_method(lambda h: self.containers.remove(h))
         return container
 
+    def _on_units_changed(self, scalex=False, scaley=False):
+        """
+        Callback for processing changes to axis units.
+
+        Currently forces updates of data limits and view limits.
+        """
+        self.relim()
+        self.autoscale_view(scalex=scalex, scaley=scaley)
+
     def relim(self, visible_only=False):
         """
         Recompute the data limits based on current artists. If you want to
@@ -2012,6 +1996,7 @@ class _AxesBase(martist.Artist):
                 # we need to update.
                 if ydata is not None:
                     self.yaxis.update_units(ydata)
+        return kwargs
 
     def in_axes(self, mouseevent):
         """
@@ -2987,10 +2972,10 @@ class _AxesBase(martist.Artist):
 
         matplotlib.scale.LogisticTransform : logit transform
         """
-        # If the scale is being set to log, clip nonposx to prevent headaches
+        # If the scale is being set to log, mask nonposx to prevent headaches
         # around zero
         if value.lower() == 'log' and 'nonposx' not in kwargs:
-            kwargs['nonposx'] = 'clip'
+            kwargs['nonposx'] = 'mask'
 
         g = self.get_shared_x_axes()
         for ax in g.get_siblings(self):
@@ -3037,9 +3022,9 @@ class _AxesBase(martist.Artist):
 
         Parameters
         ----------
-        minor : bool
+        minor : bool, optional
            If True return the minor ticklabels,
-           else return the major ticklabels
+           else return the major ticklabels.
 
         which : None, ('minor', 'major', 'both')
            Overrides `minor`.
@@ -3063,6 +3048,19 @@ class _AxesBase(martist.Artist):
         ----------
         labels : list of str
             list of string labels
+
+        fontdict : dict, optional
+            A dictionary controlling the appearance of the ticklabels,
+            the default `fontdict` is:
+
+               {'fontsize': rcParams['axes.titlesize'],
+                'fontweight' : rcParams['axes.titleweight'],
+                'verticalalignment': 'baseline',
+                'horizontalalignment': loc}
+
+        minor : bool, optional
+            If True select the minor ticklabels,
+            else select the minor ticklabels
 
         Returns
         -------
@@ -3281,10 +3279,10 @@ class _AxesBase(martist.Artist):
 
         matplotlib.scale.LogisticTransform : logit transform
         """
-        # If the scale is being set to log, clip nonposy to prevent headaches
+        # If the scale is being set to log, mask nonposy to prevent headaches
         # around zero
         if value.lower() == 'log' and 'nonposy' not in kwargs:
-            kwargs['nonposy'] = 'clip'
+            kwargs['nonposy'] = 'mask'
 
         g = self.get_shared_y_axes()
         for ax in g.get_siblings(self):
@@ -3360,6 +3358,19 @@ class _AxesBase(martist.Artist):
         ----------
         labels : list of str
             list of string labels
+
+        fontdict : dict, optional
+            A dictionary controlling the appearance of the ticklabels,
+            the default `fontdict` is::
+
+               {'fontsize': rcParams['axes.titlesize'],
+                'fontweight' : rcParams['axes.titleweight'],
+                'verticalalignment': 'baseline',
+                'horizontalalignment': loc}
+
+        minor : bool, optional
+            If True select the minor ticklabels,
+            else select the minor ticklabels
 
         Returns
         -------
@@ -3853,7 +3864,7 @@ class _AxesBase(martist.Artist):
 
     def contains(self, mouseevent):
         """
-        Test whether the mouse event occured in the axes.
+        Test whether the mouse event occurred in the axes.
 
         Returns *True* / *False*, {}
         """

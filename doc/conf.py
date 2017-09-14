@@ -15,6 +15,8 @@ import os
 import sys
 import sphinx
 import six
+from glob import glob
+from sphinx_gallery.sorting import ExplicitOrder
 
 # If your extensions are in another directory, add it here. If the directory
 # is relative to the documentation root, use os.path.abspath to make it
@@ -87,6 +89,7 @@ if not has_dot:
 autosummary_generate = True
 
 autodoc_docstring_signature = True
+autodoc_default_flags = ['members', 'undoc-members']
 
 intersphinx_mapping = {
   'python': ('https://docs.python.org/', None),
@@ -95,17 +98,41 @@ intersphinx_mapping = {
   'pandas': ('http://pandas.pydata.org/pandas-docs/stable', None)
   }
 
+explicit_order_folders = [
+                          '../examples/api',
+                          '../examples/pyplots',
+                          '../examples/subplots_axes_and_figures',
+                          '../examples/color',
+                          '../examples/statistics',
+                          '../examples/lines_bars_and_markers',
+                          '../examples/images_contours_and_fields',
+                          '../examples/shapes_and_collections',
+                          '../examples/text_labels_and_annotations',
+                          '../examples/pie_and_polar_charts',
+                          '../examples/style_sheets',
+                          '../examples/axes_grid',
+                          '../examples/showcase',
+                          '../tutorials/introductory',
+                          '../tutorials/intermediate',
+                          '../tutorials/advanced']
+for folder in sorted(glob('../examples/*') + glob('../tutorials/*')):
+    if not os.path.isdir(folder) or folder in explicit_order_folders:
+        continue
+    explicit_order_folders.append(folder)
 
 # Sphinx gallery configuration
 sphinx_gallery_conf = {
     'examples_dirs': ['../examples', '../tutorials'],
     'filename_pattern': '^((?!sgskip).)*$',
     'gallery_dirs': ['gallery', 'tutorials'],
-    'doc_module': ('matplotlib',),
-    'reference_url': {'matplotlib': None,
-                      'numpy': 'http://docs.scipy.org/doc/numpy/reference',
-                      'scipy': 'http://docs.scipy.org/doc/scipy/reference'},
-    'backreferences_dir': 'api/_as_gen'
+    'doc_module': ('matplotlib', 'mpl_toolkits'),
+    'reference_url': {
+        'matplotlib': None,
+        'numpy': 'https://docs.scipy.org/doc/numpy',
+        'scipy': 'https://docs.scipy.org/doc/scipy/reference',
+    },
+    'backreferences_dir': 'api/_as_gen',
+    'subsection_order': ExplicitOrder(explicit_order_folders)
 }
 
 plot_gallery = True
@@ -166,32 +193,6 @@ default_role = 'obj'
 # ----------------------------
 
 plot_formats = [('png', 100), ('pdf', 100)]
-
-# Subdirectories in 'examples/' directory of package and titles for gallery
-mpl_example_sections = [
-    ('lines_bars_and_markers', 'Lines, bars, and markers'),
-    ('shapes_and_collections', 'Shapes and collections'),
-    ('statistics', 'Statistical plots'),
-    ('images_contours_and_fields', 'Images, contours, and fields'),
-    ('pie_and_polar_charts', 'Pie and polar charts'),
-    ('color', 'Color'),
-    ('text_labels_and_annotations', 'Text, labels, and annotations'),
-    ('ticks_and_spines', 'Ticks and spines'),
-    ('scales', 'Axis scales'),
-    ('subplots_axes_and_figures', 'Subplots, axes, and figures'),
-    ('style_sheets', 'Style sheets'),
-    ('specialty_plots', 'Specialty plots'),
-    ('showcase', 'Showcase'),
-    ('api', 'API'),
-    ('pylab_examples', 'pylab examples'),
-    ('mplot3d', 'mplot3d toolkit'),
-    ('axes_grid1', 'axes_grid1 toolkit'),
-    ('axisartist', 'axisartist toolkit'),
-    ('units', 'units'),
-    ('widgets', 'widgets'),
-    ('misc', 'Miscellaneous examples'),
-    ]
-
 
 # Github extension
 

@@ -57,7 +57,7 @@ class TriInterpolator(object):
         self._unit_y = 1.0
 
         # Default triangle renumbering: None (= no renumbering)
-        # Renumbering may be used to avoid unecessary computations
+        # Renumbering may be used to avoid unnecessary computations
         # if complex calculations are done inside the Interpolator.
         # Please refer to :meth:`_interpolate_multikeys` for details.
         self._tri_renum = None
@@ -417,10 +417,10 @@ class CubicTriInterpolator(TriInterpolator):
         self._z = self._z[~node_mask]
 
         # Computing scale factors
-        self._unit_x = np.max(compressed_x) - np.min(compressed_x)
-        self._unit_y = np.max(compressed_y) - np.min(compressed_y)
-        self._pts = np.vstack((compressed_x/float(self._unit_x),
-                               compressed_y/float(self._unit_y))).T
+        self._unit_x = np.ptp(compressed_x)
+        self._unit_y = np.ptp(compressed_y)
+        self._pts = np.column_stack([compressed_x / self._unit_x,
+                                     compressed_y / self._unit_y])
         # Computing triangle points
         self._tris_pts = self._pts[self._triangles]
         # Computing eccentricities

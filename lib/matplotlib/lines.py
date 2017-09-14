@@ -16,7 +16,8 @@ import numpy as np
 from . import artist, colors as mcolors, docstring, rcParams
 from .artist import Artist, allow_rasterization
 from .cbook import (
-    iterable, is_numlike, ls_mapper, ls_mapper_r, STEP_LOOKUP_MAP)
+    _to_unmasked_float_array, iterable, is_numlike, ls_mapper, ls_mapper_r,
+    STEP_LOOKUP_MAP)
 from .markers import MarkerStyle
 from .path import Path
 from .transforms import Bbox, TransformedPath, IdentityTransform
@@ -648,37 +649,17 @@ class Line2D(Artist):
     def recache(self, always=False):
         if always or self._invalidx:
             xconv = self.convert_xunits(self._xorig)
-            if isinstance(self._xorig, np.ma.MaskedArray):
-                x = np.ma.asarray(xconv, float).filled(np.nan)
-            else:
-                x = np.asarray(xconv, float)
-            x = x.ravel()
+            x = _to_unmasked_float_array(xconv).ravel()
         else:
             x = self._x
         if always or self._invalidy:
             yconv = self.convert_yunits(self._yorig)
-            if isinstance(self._yorig, np.ma.MaskedArray):
-                y = np.ma.asarray(yconv, float).filled(np.nan)
-            else:
-                y = np.asarray(yconv, float)
-            y = y.ravel()
+            y = _to_unmasked_float_array(yconv).ravel()
         else:
             y = self._y
 
-        if len(x) == 1 and len(y) > 1:
-            x = x * np.ones(y.shape, float)
-        if len(y) == 1 and len(x) > 1:
-            y = y * np.ones(x.shape, float)
-
-        if len(x) != len(y):
-            raise RuntimeError('xdata and ydata must be the same length')
-
-        self._xy = np.empty((len(x), 2), dtype=float)
-        self._xy[:, 0] = x
-        self._xy[:, 1] = y
-
-        self._x = self._xy[:, 0]  # just a view
-        self._y = self._xy[:, 1]  # just a view
+        self._xy = np.column_stack(np.broadcast_arrays(x, y)).astype(float)
+        self._x, self._y = self._xy.T  # views
 
         self._subslice = False
         if (self.axes and len(x) > 1000 and self._is_sorted(x) and
@@ -771,11 +752,9 @@ class Line2D(Artist):
             renderer = PathEffectRenderer(self.get_path_effects(), renderer)
 
         renderer.open_group('line2d', self.get_gid())
-        funcname = self._lineStyles.get(self._linestyle, '_draw_nothing')
-        if funcname != '_draw_nothing':
+        if self._lineStyles[self._linestyle] != '_draw_nothing':
             tpath, affine = transf_path.get_transformed_path_and_affine()
             if len(tpath.vertices):
-                line_func = getattr(self, funcname)
                 gc = renderer.new_gc()
                 self._set_gc_clip(gc)
 
@@ -798,7 +777,8 @@ class Line2D(Artist):
                 if self.get_sketch_params() is not None:
                     gc.set_sketch_params(*self.get_sketch_params())
 
-                line_func(renderer, gc, tpath, affine.frozen())
+                gc.set_dashes(self._dashOffset, self._dashSeq)
+                renderer.draw_path(gc, tpath, affine.frozen())
                 gc.restore()
 
         if self._marker and self._markersize > 0:
@@ -1160,7 +1140,8 @@ class Line2D(Artist):
         """
         if ec is None:
             ec = 'auto'
-        if self._markeredgecolor is None or self._markeredgecolor != ec:
+        if self._markeredgecolor is None or \
+           np.any(self._markeredgecolor != ec):
             self.stale = True
         self._markeredgecolor = ec
 
@@ -1184,7 +1165,7 @@ class Line2D(Artist):
         """
         if fc is None:
             fc = 'auto'
-        if self._markerfacecolor != fc:
+        if np.any(self._markerfacecolor != fc):
             self.stale = True
         self._markerfacecolor = fc
 
@@ -1196,7 +1177,7 @@ class Line2D(Artist):
         """
         if fc is None:
             fc = 'auto'
-        if self._markerfacecoloralt != fc:
+        if np.any(self._markerfacecoloralt != fc):
             self.stale = True
         self._markerfacecoloralt = fc
 
@@ -1243,26 +1224,6 @@ class Line2D(Artist):
             self.set_linestyle('-')
         else:
             self.set_linestyle((0, seq))
-
-    def _draw_solid(self, renderer, gc, path, trans):
-        gc.set_linestyle('solid')
-        gc.set_dashes(self._dashOffset, self._dashSeq)
-        renderer.draw_path(gc, path, trans)
-
-    def _draw_dashed(self, renderer, gc, path, trans):
-        gc.set_linestyle('dashed')
-        gc.set_dashes(self._dashOffset, self._dashSeq)
-        renderer.draw_path(gc, path, trans)
-
-    def _draw_dash_dot(self, renderer, gc, path, trans):
-        gc.set_linestyle('dashdot')
-        gc.set_dashes(self._dashOffset, self._dashSeq)
-        renderer.draw_path(gc, path, trans)
-
-    def _draw_dotted(self, renderer, gc, path, trans):
-        gc.set_linestyle('dotted')
-        gc.set_dashes(self._dashOffset, self._dashSeq)
-        renderer.draw_path(gc, path, trans)
 
     def update_from(self, other):
         """copy properties from other to self"""

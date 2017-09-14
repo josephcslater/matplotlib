@@ -9,14 +9,14 @@ import six
 from six.moves import StringIO
 
 import glob, os, shutil, sys, time, datetime
-def _fn_name(): return sys._getframe(1).f_code.co_name
 import io
 
 from tempfile import mkstemp
 from matplotlib import verbose, __version__, rcParams, checkdep_ghostscript
 from matplotlib.afm import AFM
-from matplotlib.backend_bases import (RendererBase, GraphicsContextBase,
-                                      FigureManagerBase, FigureCanvasBase)
+from matplotlib.backend_bases import (
+    _Backend, FigureCanvasBase, FigureManagerBase, GraphicsContextBase,
+    RendererBase)
 
 from matplotlib.cbook import (get_realpath_and_stat, is_writable_file_like,
                               maxdict, file_requires_unicode)
@@ -137,8 +137,7 @@ def _get_papertype(w, h):
         if key.startswith('l'): continue
         pw, ph = papersize[key]
         if (w < pw) and (h < ph): return key
-    else:
-        return 'a0'
+    return 'a0'
 
 def _num_to_str(val):
     if isinstance(val, six.string_types): return val
@@ -891,21 +890,6 @@ class GraphicsContextPS(GraphicsContextBase):
     def shouldstroke(self):
         return (self.get_linewidth() > 0.0 and
                 (len(self.get_rgb()) <= 3 or self.get_rgb()[3] != 0.0))
-
-
-def new_figure_manager(num, *args, **kwargs):
-    FigureClass = kwargs.pop('FigureClass', Figure)
-    thisFig = FigureClass(*args, **kwargs)
-    return new_figure_manager_given_figure(num, thisFig)
-
-
-def new_figure_manager_given_figure(num, figure):
-    """
-    Create a new figure manager instance for the given figure.
-    """
-    canvas = FigureCanvasPS(figure)
-    manager = FigureManagerPS(canvas, num)
-    return manager
 
 
 class FigureCanvasPS(FigureCanvasBase):
@@ -1787,5 +1771,8 @@ psDefs = [
     } bind def""",
 ]
 
-FigureCanvas = FigureCanvasPS
-FigureManager = FigureManagerPS
+
+@_Backend.export
+class _BackendPS(_Backend):
+    FigureCanvas = FigureCanvasPS
+    FigureManager = FigureManagerPS

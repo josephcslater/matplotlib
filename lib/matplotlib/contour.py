@@ -334,6 +334,7 @@ class ContourLabeler(object):
         part of the contour).
         """
 
+        # Number of contour points
         nsize = len(linecontour)
         if labelwidth > 1:
             xsize = int(np.ceil(nsize / labelwidth))
@@ -353,7 +354,10 @@ class ContourLabeler(object):
         xlast = XX[:, -1].reshape(xsize, 1)
         s = (yfirst - YY) * (xlast - xfirst) - (xfirst - XX) * (ylast - yfirst)
         L = np.sqrt((xlast - xfirst) ** 2 + (ylast - yfirst) ** 2).ravel()
-        dist = np.add.reduce(([(abs(s)[i] / L[i]) for i in range(xsize)]), -1)
+        # Ignore warning that divide by zero throws, as this is a valid option
+        with np.errstate(divide='ignore', invalid='ignore'):
+            dist = np.add.reduce([(abs(s)[i] / L[i]) for i in range(xsize)],
+                                 -1)
         x, y, ind = self.get_label_coords(dist, XX, YY, ysize, labelwidth)
 
         # There must be a more efficient way...
@@ -448,7 +452,10 @@ class ContourLabeler(object):
 
             # Round to integer values but keep as float
             # To allow check against nan below
-            I = [np.floor(I[0]), np.ceil(I[1])]
+            # Ignore nans here to avoid throwing an error on Appveyor build
+            # (can possibly be removed when build uses numpy 1.13)
+            with np.errstate(invalid='ignore'):
+                I = [np.floor(I[0]), np.ceil(I[1])]
 
             # Actually break contours
             if closed:
@@ -793,23 +800,23 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         :attr:`matplotlib.contour.QuadContourSet.contour_doc`.
         """
         self.ax = ax
-        self.levels = kwargs.get('levels', None)
-        self.filled = kwargs.get('filled', False)
-        self.linewidths = kwargs.get('linewidths', None)
-        self.linestyles = kwargs.get('linestyles', None)
+        self.levels = kwargs.pop('levels', None)
+        self.filled = kwargs.pop('filled', False)
+        self.linewidths = kwargs.pop('linewidths', None)
+        self.linestyles = kwargs.pop('linestyles', None)
 
-        self.hatches = kwargs.get('hatches', [None])
+        self.hatches = kwargs.pop('hatches', [None])
 
-        self.alpha = kwargs.get('alpha', None)
-        self.origin = kwargs.get('origin', None)
-        self.extent = kwargs.get('extent', None)
-        cmap = kwargs.get('cmap', None)
-        self.colors = kwargs.get('colors', None)
-        norm = kwargs.get('norm', None)
-        vmin = kwargs.get('vmin', None)
-        vmax = kwargs.get('vmax', None)
-        self.extend = kwargs.get('extend', 'neither')
-        self.antialiased = kwargs.get('antialiased', None)
+        self.alpha = kwargs.pop('alpha', None)
+        self.origin = kwargs.pop('origin', None)
+        self.extent = kwargs.pop('extent', None)
+        cmap = kwargs.pop('cmap', None)
+        self.colors = kwargs.pop('colors', None)
+        norm = kwargs.pop('norm', None)
+        vmin = kwargs.pop('vmin', None)
+        vmax = kwargs.pop('vmax', None)
+        self.extend = kwargs.pop('extend', 'neither')
+        self.antialiased = kwargs.pop('antialiased', None)
         if self.antialiased is None and self.filled:
             self.antialiased = False  # eliminate artifacts; we are not
                                       # stroking the boundaries.
@@ -817,8 +824,8 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             # the LineCollection default, which uses the
             # rcParams['lines.antialiased']
 
-        self.nchunk = kwargs.get('nchunk', 0)
-        self.locator = kwargs.get('locator', None)
+        self.nchunk = kwargs.pop('nchunk', 0)
+        self.locator = kwargs.pop('locator', None)
         if (isinstance(norm, colors.LogNorm)
                 or isinstance(self.locator, ticker.LogLocator)):
             self.logscale = True
@@ -841,9 +848,9 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         if self.origin == 'image':
             self.origin = mpl.rcParams['image.origin']
 
-        self._transform = kwargs.get('transform', None)
+        self._transform = kwargs.pop('transform', None)
 
-        self._process_args(*args, **kwargs)
+        kwargs = self._process_args(*args, **kwargs)
         self._process_levels()
 
         if self.colors is not None:
@@ -908,11 +915,12 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             if self.allkinds is None:
                 self.allkinds = [None] * len(self.allsegs)
 
+            # Default zorder taken from Collection
+            zorder = kwargs.pop('zorder', 1)
             for level, level_upper, segs, kinds in \
                     zip(lowers, uppers, self.allsegs, self.allkinds):
                 paths = self._make_paths(segs, kinds)
-                # Default zorder taken from Collection
-                zorder = kwargs.get('zorder', 1)
+
                 col = mcoll.PathCollection(
                     paths,
                     antialiaseds=(self.antialiased,),
@@ -929,10 +937,10 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             aa = self.antialiased
             if aa is not None:
                 aa = (self.antialiased,)
+            # Default zorder taken from LineCollection
+            zorder = kwargs.pop('zorder', 2)
             for level, width, lstyle, segs in \
                     zip(self.levels, tlinewidths, tlinestyles, self.allsegs):
-                # Default zorder taken from LineCollection
-                zorder = kwargs.get('zorder', 2)
                 col = mcoll.LineCollection(
                     segs,
                     antialiaseds=aa,
@@ -952,6 +960,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self.ax.autoscale_view(tight=True)
 
         self.changed()  # set the colors
+
+        if kwargs:
+            s = ", ".join(map(repr, kwargs))
+            warnings.warn('The following kwargs were not used by contour: ' +
+                          s)
 
     def get_transform(self):
         """
@@ -1061,6 +1074,8 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self._mins = points.min(axis=0)
         self._maxs = points.max(axis=0)
 
+        return kwargs
+
     def _get_allsegs_and_allkinds(self):
         """
         Override in derived classes to create and return allsegs and allkinds.
@@ -1125,14 +1140,10 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                 self.locator = ticker.LogLocator()
             else:
                 self.locator = ticker.MaxNLocator(N + 1, min_n_ticks=1)
-        zmax = self.zmax
-        zmin = self.zmin
-        lev = self.locator.tick_values(zmin, zmax)
+
+        lev = self.locator.tick_values(self.zmin, self.zmax)
         self._auto = True
-        if self.filled:
-            return lev
-        # For line contours, drop levels outside the data range.
-        return lev[(lev > zmin) & (lev < zmax)]
+        return lev
 
     def _contour_level_args(self, z, args):
         """
@@ -1158,6 +1169,17 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                         "Last {0} arg must give levels; see help({0})"
                         .format(fn))
             self.levels = lev
+        else:
+            self.levels = np.asarray(self.levels).astype(np.float64)
+
+        if not self.filled:
+            inside = (self.levels > self.zmin) & (self.levels < self.zmax)
+            self.levels = self.levels[inside]
+            if len(self.levels) == 0:
+                self.levels = [self.zmin]
+                warnings.warn("No contour levels were found"
+                              " within the data range.")
+
         if self.filled and len(self.levels) < 2:
             raise ValueError("Filled contours require at least 2 levels.")
 
@@ -1247,11 +1269,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             i0, i1 = 0, len(self.levels)
             if self.filled:
                 i1 -= 1
-            # Out of range indices for over and under:
-            if self.extend in ('both', 'min'):
-                i0 = -1
-            if self.extend in ('both', 'max'):
-                i1 += 1
+                # Out of range indices for over and under:
+                if self.extend in ('both', 'min'):
+                    i0 -= 1
+                if self.extend in ('both', 'max'):
+                    i1 += 1
             self.cvalues = list(range(i0, i1))
             self.set_norm(colors.NoNorm())
         else:
@@ -1417,7 +1439,7 @@ class QuadContourSet(ContourSet):
             self._mins = args[0]._mins
             self._maxs = args[0]._maxs
         else:
-            self._corner_mask = kwargs.get('corner_mask', None)
+            self._corner_mask = kwargs.pop('corner_mask', None)
             if self._corner_mask is None:
                 self._corner_mask = mpl.rcParams['contour.corner_mask']
 
@@ -1455,6 +1477,8 @@ class QuadContourSet(ContourSet):
             self.Cntr = contour_generator
         else:
             self._contour_generator = contour_generator
+
+        return kwargs
 
     def _get_allsegs_and_allkinds(self):
         """
@@ -1525,7 +1549,7 @@ class QuadContourSet(ContourSet):
         Exception class (here and elsewhere).
         """
         x, y = args[:2]
-        self.ax._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
+        kwargs = self.ax._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
         x = self.ax.convert_xunits(x)
         y = self.ax.convert_yunits(y)
 

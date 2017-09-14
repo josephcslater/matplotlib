@@ -81,7 +81,7 @@ class Widget(object):
         """
         return self._active
 
-    # set_active is overriden by SelectorWidgets.
+    # set_active is overridden by SelectorWidgets.
     active = property(get_active, lambda self, active: self.set_active(active),
                       doc="Is the widget active?")
 
@@ -335,6 +335,8 @@ class Slider(AxesWidget):
         self.valmin = valmin
         self.valmax = valmax
         valinit = self._value_in_bounds(valinit)
+        if valinit is None:
+            valinit = valmin
         self.val = valinit
         self.valinit = valinit
         self.poly = ax.axvspan(valmin, valinit, 0, 1, **kwargs)
@@ -407,8 +409,9 @@ class Slider(AxesWidget):
             self.drag_active = False
             event.canvas.release_mouse(self.ax)
             return
-        val = event.xdata
-        self.set_val(self._value_in_bounds(val))
+        val = self._value_in_bounds(event.xdata)
+        if val is not None:
+            self.set_val(val)
 
     def set_val(self, val):
         xy = self.poly.xy

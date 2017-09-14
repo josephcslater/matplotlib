@@ -8,7 +8,7 @@ drawing legends associated with axes and/or figures.
     Most users would normally create a legend via the
     :meth:`~matplotlib.axes.Axes.legend` function. For more details on legends
     there is also a :ref:`legend guide
-    <sphx_glr_tutorials_02_intermediate_legend_guide.py>`.
+    <sphx_glr_tutorials_intermediate_legend_guide.py>`.
 
 The Legend class can be considered as a container of legend handles
 and legend texts. Creation of corresponding legend handles from the
@@ -19,7 +19,7 @@ handlers are defined in the :mod:`~matplotlib.legend_handler` module).
 Note that not all kinds of artist are supported by the legend yet by default
 but it is possible to extend the legend handler's capabilities to support
 arbitrary objects. See the :ref:`legend guide
-<sphx_glr_tutorials_02_intermediate_legend_guide.py>` for more information.
+<sphx_glr_tutorials_intermediate_legend_guide.py>` for more information.
 
 """
 from __future__ import (absolute_import, division, print_function,
@@ -118,7 +118,7 @@ class Legend(Artist):
       'upper left'   : 2,
       'lower left'   : 3,
       'lower right'  : 4,
-      'right'        : 5,
+      'right'        : 5, (same as 'center right', for back-compatibility)
       'center left'  : 6,
       'center right' : 7,
       'lower center' : 8,
@@ -294,7 +294,7 @@ class Legend(Artist):
             self._scatteryoffsets = np.array([3. / 8., 4. / 8., 2.5 / 8.])
         else:
             self._scatteryoffsets = np.asarray(scatteryoffsets)
-        reps = int(self.scatterpoints / len(self._scatteryoffsets)) + 1
+        reps = self.scatterpoints // len(self._scatteryoffsets) + 1
         self._scatteryoffsets = np.tile(self._scatteryoffsets,
                                         reps)[:self.scatterpoints]
 
@@ -384,8 +384,13 @@ class Legend(Artist):
         # init with null renderer
         self._init_legend_box(handles, labels, markerfirst)
 
+        # If shadow is activated use framealpha if not
+        # explicitly passed. See Issue 8943
         if framealpha is None:
-            self.get_frame().set_alpha(rcParams["legend.framealpha"])
+            if shadow:
+                self.get_frame().set_alpha(1)
+            else:
+                self.get_frame().set_alpha(rcParams["legend.framealpha"])
         else:
             self.get_frame().set_alpha(framealpha)
 
@@ -948,7 +953,7 @@ class Legend(Artist):
         draggable is on.
 
         The update parameter control which parameter of the legend changes
-        when dragged. If update is "loc", the *loc* paramter of the legend
+        when dragged. If update is "loc", the *loc* parameter of the legend
         is changed. If "bbox", the *bbox_to_anchor* parameter is changed.
         """
         is_draggable = self._draggable is not None

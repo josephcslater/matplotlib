@@ -228,14 +228,13 @@ def get_renderer(fig):
 
 
 def get_subplotspec_list(axes_list, grid_spec=None):
-    """
-    Return a list of subplotspec from the given list of axes.  For an
-    instance of axes that does not support subplotspec, None is
-    inserted in the list.
+    """Return a list of subplotspec from the given list of axes.
 
-    If grid_spec is given, None is inserted for those not from
-    the given grid_spec.
+    For an instance of axes that does not support subplotspec, None is inserted
+    in the list.
 
+    If grid_spec is given, None is inserted for those not from the given
+    grid_spec.
     """
     subplotspec_list = []
     for ax in axes_list:
@@ -318,6 +317,9 @@ def get_tight_layout_figure(fig, axes_list, subplotspec_list, renderer,
             ax_bbox_list.append(subplotspec.get_position(fig))
 
         subplots.append(ax)
+
+    if (len(nrows_list) == 0) or (len(ncols_list) == 0):
+        return {}
 
     max_nrows = max(nrows_list)
     max_ncols = max(ncols_list)

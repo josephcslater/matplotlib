@@ -748,7 +748,6 @@ class Matplotlib(SetupPackage):
                 'backends/web_backend/jquery/css/themes/base/*.min.css',
                 'backends/web_backend/jquery/css/themes/base/images/*',
                 'backends/web_backend/css/*.*',
-                'backends/web_backend/js/*.js',
                 'backends/Matplotlib.nib/*',
                 'mpl-data/stylelib/*.mplstyle',
              ]}
@@ -1341,7 +1340,7 @@ class Qhull(SetupPackage):
                                        default_libraries=['qhull'])
         else:
             ext.include_dirs.append('extern')
-            ext.sources.extend(glob.glob('extern/libqhull/*.c'))
+            ext.sources.extend(sorted(glob.glob('extern/libqhull/*.c')))
 
 
 class TTConv(SetupPackage):
@@ -1508,7 +1507,7 @@ class Cycler(SetupPackage):
 class Dateutil(SetupPackage):
     name = "dateutil"
 
-    def __init__(self, version=None):
+    def __init__(self, version='>=2.0'):
         self.version = version
 
     def check(self):
@@ -1593,17 +1592,6 @@ class Tornado(OptionalPackage):
 
 class Pyparsing(SetupPackage):
     name = "pyparsing"
-    # pyparsing 2.0.4 has broken python 3 support.
-    # pyparsing 2.1.2 is broken in python3.4/3.3.
-    def is_ok(self):
-        # pyparsing 2.0.0 bug, but it may be patched in distributions
-        try:
-            import pyparsing
-            f = pyparsing.Forward()
-            f <<= pyparsing.Literal('a')
-            return f is not None
-        except (ImportError, TypeError):
-            return False
 
     def check(self):
         try:
@@ -1614,26 +1602,10 @@ class Pyparsing(SetupPackage):
                 "support. pip/easy_install may attempt to install it "
                 "after matplotlib.")
 
-        required = [1, 5, 6]
-        if [int(x) for x in pyparsing.__version__.split('.')] < required:
-            return (
-                "matplotlib requires pyparsing >= {0}".format(
-                    '.'.join(str(x) for x in required)))
-
-        if not self.is_ok():
-            return (
-                "Your pyparsing contains a bug that will be monkey-patched by "
-                "matplotlib.  For best results, upgrade to pyparsing 2.0.1 or "
-                "later.")
-
         return "using pyparsing version %s" % pyparsing.__version__
 
     def get_install_requires(self):
-        versionstring = 'pyparsing>=1.5.6,!=2.0.4,!=2.1.2,!=2.1.6'
-        if self.is_ok():
-            return [versionstring]
-        else:
-            return [versionstring + ',!=2.0.0']
+        return ['pyparsing>=2.0.1,!=2.0.4,!=2.1.2,!=2.1.6']
 
 
 class BackendAgg(OptionalBackendPackage):

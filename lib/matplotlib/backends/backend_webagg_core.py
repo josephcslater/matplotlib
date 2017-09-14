@@ -18,7 +18,7 @@ import six
 import io
 import json
 import os
-import datetime
+import time
 import warnings
 
 import numpy as np
@@ -26,27 +26,10 @@ import tornado
 import datetime
 
 from matplotlib.backends import backend_agg
+from matplotlib.backend_bases import _Backend
 from matplotlib.figure import Figure
 from matplotlib import backend_bases
 from matplotlib import _png
-
-
-def new_figure_manager(num, *args, **kwargs):
-    """
-    Create a new figure manager instance
-    """
-    FigureClass = kwargs.pop('FigureClass', Figure)
-    thisFig = FigureClass(*args, **kwargs)
-    return new_figure_manager_given_figure(num, thisFig)
-
-
-def new_figure_manager_given_figure(num, figure):
-    """
-    Create a new figure manager instance for the given figure.
-    """
-    canvas = FigureCanvasWebAggCore(figure)
-    manager = FigureManagerWebAgg(canvas, num)
-    return manager
 
 
 # http://www.cambiaresearch.com/articles/15/javascript-char-codes-key-codes
@@ -236,8 +219,7 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
                 self._last_renderer, renderer)
             self._force_full = False
             self._png_is_old = False
-
-        return buff
+            return buff
 
     def get_renderer(self, cleared=None):
         # Mirrors super.get_renderer, but caches the old one
@@ -424,9 +406,6 @@ class NavigationToolbar2WebAgg(backend_bases.NavigationToolbar2):
             self.canvas.send_event("cursor", cursor=cursor)
         self.cursor = cursor
 
-    def dynamic_update(self):
-        self.canvas.draw_idle()
-
     def draw_rubberband(self, event, x0, y0, x1, y1):
         self.canvas.send_event(
             "rubberband", x0=x0, y0=y0, x1=x1, y1=y1)
@@ -487,8 +466,9 @@ class FigureManagerWebAgg(backend_bases.FigureManagerBase):
     def refresh_all(self):
         if self.web_sockets:
             diff = self.canvas.get_diff_image()
-            for s in self.web_sockets:
-                s.send_binary(diff)
+            if diff is not None:
+                for s in self.web_sockets:
+                    s.send_binary(diff)
 
     @classmethod
     def get_javascript(cls, stream=None):
@@ -500,7 +480,6 @@ class FigureManagerWebAgg(backend_bases.FigureManagerBase):
         with io.open(os.path.join(
                 os.path.dirname(__file__),
                 "web_backend",
-                "js",
                 "mpl.js"), encoding='utf8') as fd:
             output.write(fd.read())
 
@@ -569,3 +548,9 @@ class TimerTornado(backend_bases.TimerBase):
         if self._timer is not None:
             self._timer_stop()
             self._timer_start()
+
+
+@_Backend.export
+class _BackendWebAggCoreAgg(_Backend):
+    FigureCanvas = FigureCanvasWebAggCore
+    FigureManager = FigureManagerWebAgg
